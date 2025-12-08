@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Enum, Text
+from sqlalchemy import Column, ForeignKey, Integer, String, Float, DateTime, Enum, Text
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
 
@@ -33,6 +34,13 @@ class Coin(Base):
     notes = Column(Text, nullable=True)
     image_url_front = Column(String(500), nullable=True)
     image_url_back = Column(String(500), nullable=True)
+    
+    owner_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
@@ -40,3 +48,5 @@ class Coin(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+    
+    owner = relationship("User", back_populates="coins")

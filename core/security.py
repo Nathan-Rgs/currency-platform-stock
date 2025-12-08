@@ -12,7 +12,7 @@ from core.config import settings
 from core.session import get_db
 from models.user import User
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 from core.config import settings
 

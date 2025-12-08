@@ -33,12 +33,11 @@ def create_coin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    coin = Coin(**coin_in.model_dump())
+    coin = Coin(**coin_in.model_dump(), owner_id=current_user.id)
     db.add(coin)
     db.commit()
     db.refresh(coin)
     return coin
-
 
 @router.get("", response_model=PaginatedResponse[CoinRead])
 def list_coins(
@@ -55,7 +54,7 @@ def list_coins(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = db.query(Coin)
+    query = db.query(Coin).filter(Coin.owner_id == current_user.id)
 
     if country:
         query = query.filter(Coin.country.ilike(f"%{country}%"))
@@ -108,7 +107,11 @@ def get_coin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    coin = db.query(Coin).filter(Coin.id == coin_id).first()
+    coin = (
+        db.query(Coin)
+        .filter(Coin.id == coin_id, Coin.owner_id == current_user.id)
+        .first()
+    )
     if not coin:
         raise HTTPException(status_code=404, detail="Coin not found")
     return coin
@@ -225,7 +228,7 @@ async def import_coins(
         for item in data:
             try:
                 coin_in = CoinCreate(**item)
-                coin = Coin(**coin_in.model_dump())
+                coin = Coin(**coin_in.model_dump(), owner_id=current_user.id)
                 db.add(coin)
                 inserted += 1
             except Exception:
@@ -260,7 +263,7 @@ def export_coins(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    coins = db.query(Coin).all()
+    coins = db.query(Coin).filter(Coin.owner_id == current_user.id).all()
     data = [CoinRead.model_validate(c).model_dump() for c in coins]
 
     if format == "json":
