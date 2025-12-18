@@ -1,40 +1,46 @@
-from fastapi import FastAPI
+import os
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from core.config import settings
-from core.db import Base
-from core.session import engine
-from routers import auth, coins, dashboard
+from routers import auth, coins, dashboard, health
 
-# Cria as tabelas (ou use Alembic em prod)
-Base.metadata.create_all(bind=engine)
+MEDIA_DIR = "media"
+
+# Context manager para eventos de startup e shutdown da aplicação.
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("INFO:     Iniciando a aplicação...")
+    os.makedirs(os.path.join(MEDIA_DIR, "coins"), exist_ok=True)
+    print(f"INFO:     Diretório de mídia '{MEDIA_DIR}/coins' verificado/criado.")
+    yield
+    print("INFO:     Encerrando a aplicação...")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
+    docs_url=f"{settings.API_V1_PREFIX}/docs",
+    redoc_url=f"{settings.API_V1_PREFIX}/redoc",
+    lifespan=lifespan,
 )
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[str(o) for o in settings.BACKEND_CORS_ORIGINS] or ["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if settings.BACKEND_CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[str(o) for o in settings.BACKEND_CORS_ORIGINS],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-# Static files para imagens
-app.mount("/media", StaticFiles(directory="media"), name="media")
+app.mount(f"/{MEDIA_DIR}", StaticFiles(directory=MEDIA_DIR), name="media")
 
-# Routers
-app.include_router(auth.router, prefix=settings.API_V1_STR)
-app.include_router(coins.router, prefix=settings.API_V1_STR)
-app.include_router(dashboard.router, prefix=settings.API_V1_STR)
+api_router = APIRouter(prefix=settings.API_V1_PREFIX)
+api_router.include_router(auth.router)
+api_router.include_router(coins.router)
+api_router.include_router(dashboard.router)
 
-
-@app.get("/")
-def healthcheck():
-    return {"status": "ok", "app": settings.PROJECT_NAME}
+app.include_router(health.router)
+app.include_router(api_router)

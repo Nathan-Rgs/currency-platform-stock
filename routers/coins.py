@@ -1,30 +1,43 @@
+import csv
+import io
+import os
+import uuid
+from datetime import datetime
 from typing import List, Optional
+
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    UploadFile,
-    File,
     Query,
     status,
+    UploadFile,
+    File,
 )
+from fastapi.responses import JSONResponse, StreamingResponse
+from sqlalchemy import func, select, or_
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
-from core.session import get_db
-from models.coin import Coin, OriginalityEnum
-from schemas.coin import CoinCreate, CoinUpdate, CoinRead
-from schemas.common import PaginatedResponse, PaginationMeta
+from core.database import get_db
 from core.security import get_current_user
+from models.coin import Coin, OriginalityEnum
 from models.user import User
-import os
-from uuid import uuid4
-from fastapi.responses import StreamingResponse, JSONResponse
-import csv
-import io
-from datetime import datetime
+from schemas.coin import CoinCreate, CoinRead, CoinUpdate
+from schemas.common import PaginatedResponse, PaginationMeta
 
 router = APIRouter(prefix="/coins", tags=["coins"])
+MEDIA_DIR = "media/coins"
+
+
+def get_coin_or_404(db: Session, coin_id: int, user_id: int) -> Coin:
+    """Busca uma moeda pelo ID, garantindo que ela pertença ao usuário. Falha com 404 caso contrário."""
+    query = select(Coin).where(Coin.id == coin_id, Coin.owner_id == user_id)
+    coin = db.execute(query).scalars().first()
+    if not coin:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coin not found"
+        )
+    return coin
 
 
 @router.post("", response_model=CoinRead, status_code=status.HTTP_201_CREATED)
@@ -39,81 +52,57 @@ def create_coin(
     db.refresh(coin)
     return coin
 
+
 @router.get("", response_model=PaginatedResponse[CoinRead])
 def list_coins(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    country: Optional[str] = None,
-    year_from: Optional[int] = None,
-    year_to: Optional[int] = None,
-    originality: Optional[OriginalityEnum] = None,
-    condition: Optional[str] = None,
-    min_price: Optional[float] = None,
-    max_price: Optional[float] = None,
-    search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    country: Optional[str] = Query(None),
+    year_from: Optional[int] = Query(None),
+    year_to: Optional[int] = Query(None),
+    originality: Optional[OriginalityEnum] = Query(None),
+    search: Optional[str] = Query(None, description="Search in country, value, and notes"),
 ):
-    query = db.query(Coin).filter(Coin.owner_id == current_user.id)
+    base_query = select(Coin).where(Coin.owner_id == current_user.id)
 
     if country:
-        query = query.filter(Coin.country.ilike(f"%{country}%"))
+        base_query = base_query.where(Coin.country.ilike(f"%{country}%"))
     if year_from is not None:
-        query = query.filter(Coin.year >= year_from)
+        base_query = base_query.where(Coin.year >= year_from)
     if year_to is not None:
-        query = query.filter(Coin.year <= year_to)
+        base_query = base_query.where(Coin.year <= year_to)
     if originality:
-        query = query.filter(Coin.originality == originality)
-    if condition:
-        query = query.filter(Coin.condition.ilike(f"%{condition}%"))
-    if min_price is not None:
-        query = query.filter(Coin.purchase_price >= min_price)
-    if max_price is not None:
-        query = query.filter(Coin.purchase_price <= max_price)
+        base_query = base_query.where(Coin.originality == originality)
     if search:
         like = f"%{search}%"
-        query = query.filter(
-            (Coin.country.ilike(like))
-            | (Coin.face_value.ilike(like))
-            | (Coin.notes.ilike(like))
+        base_query = base_query.where(
+            or_(Coin.country.ilike(like), Coin.face_value.ilike(like), Coin.notes.ilike(like))
         )
 
-    total_items = query.count()
+    count_query = select(func.count()).select_from(base_query.subquery())
+    total_items = db.scalar(count_query) or 0
     total_pages = (total_items + page_size - 1) // page_size
 
-    coins = (
-        query.order_by(Coin.year.desc())
+    items_query = (
+        base_query.order_by(Coin.year.desc(), Coin.country)
         .offset((page - 1) * page_size)
         .limit(page_size)
-        .all()
     )
+    coins = db.execute(items_query).scalars().all()
 
-    meta = PaginationMeta(
-        page=page,
-        page_size=page_size,
-        total_items=total_items,
-        total_pages=total_pages,
-    )
-
-    return PaginatedResponse[CoinRead](
-        data=coins,
-        meta=meta,
-    )
+    meta = PaginationMeta(page=page, page_size=page_size, total_items=total_items, total_pages=total_pages)
+    return PaginatedResponse(data=coins, meta=meta)
 
 
 @router.get("/{coin_id}", response_model=CoinRead)
-def get_coin(
+def get_coin_by_id(
     coin_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    coin = (
-        db.query(Coin)
-        .filter(Coin.id == coin_id, Coin.owner_id == current_user.id)
-        .first()
-    )
-    if not coin:
-        raise HTTPException(status_code=404, detail="Coin not found")
+    coin = get_coin_or_404(db, coin_id, current_user.id)
     return coin
 
 
@@ -124,13 +113,9 @@ def update_coin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    coin = db.query(Coin).filter(Coin.id == coin_id).first()
-    if not coin:
-        raise HTTPException(status_code=404, detail="Coin not found")
-
+    coin = get_coin_or_404(db, coin_id, current_user.id)
     for field, value in coin_in.model_dump().items():
         setattr(coin, field, value)
-
     db.commit()
     db.refresh(coin)
     return coin
@@ -143,14 +128,10 @@ def partial_update_coin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    coin = db.query(Coin).filter(Coin.id == coin_id).first()
-    if not coin:
-        raise HTTPException(status_code=404, detail="Coin not found")
-
-    data = coin_in.model_dump(exclude_unset=True)
-    for field, value in data.items():
+    coin = get_coin_or_404(db, coin_id, current_user.id)
+    update_data = coin_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
         setattr(coin, field, value)
-
     db.commit()
     db.refresh(coin)
     return coin
@@ -162,42 +143,38 @@ def delete_coin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    coin = db.query(Coin).filter(Coin.id == coin_id).first()
-    if not coin:
-        raise HTTPException(status_code=404, detail="Coin not found")
-
+    coin = get_coin_or_404(db, coin_id, current_user.id)
     db.delete(coin)
     db.commit()
     return
 
 
-MEDIA_DIR = "media/coins"
-os.makedirs(MEDIA_DIR, exist_ok=True)
-
 @router.post("/{coin_id}/upload-image", response_model=CoinRead)
-async def upload_image(
+def upload_coin_image(
     coin_id: int,
-    front: Optional[UploadFile] = File(None),
-    back: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    front_image: UploadFile | None = File(None),
+    back_image: UploadFile | None = File(None),
 ):
-    coin = db.query(Coin).filter(Coin.id == coin_id).first()
-    if not coin:
-        raise HTTPException(status_code=404, detail="Coin not found")
+    if not front_image and not back_image:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "At least one image is required.")
+
+    coin = get_coin_or_404(db, coin_id, current_user.id)
 
     def save_file(file: UploadFile) -> str:
-        ext = os.path.splitext(file.filename)[1]
-        filename = f"{uuid4().hex}{ext}"
+        os.makedirs(MEDIA_DIR, exist_ok=True)
+        ext = os.path.splitext(file.filename)[-1]
+        filename = f"{uuid.uuid4().hex}{ext}"
         path = os.path.join(MEDIA_DIR, filename)
         with open(path, "wb") as f:
             f.write(file.file.read())
-        return f"/media/coins/{filename}"
+        return f"/{path.replace(os.sep, '/')}"
 
-    if front:
-        coin.image_url_front = save_file(front)
-    if back:
-        coin.image_url_back = save_file(back)
+    if front_image:
+        coin.image_url_front = save_file(front_image)
+    if back_image:
+        coin.image_url_back = save_file(back_image)
 
     db.commit()
     db.refresh(coin)
@@ -205,79 +182,73 @@ async def upload_image(
 
 
 @router.post("/import")
-async def import_coins(
-    file: UploadFile = File(...),
+def import_from_file(
+    file: UploadFile,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    content = await file.read()
-    inserted = 0
-    errors = 0
+    content = file.file.read()
+    inserted, errors = 0, 0
 
-    if file.filename.endswith(".json"):
-        import json
-
-        try:
+    try:
+        if file.filename.endswith(".json"):
+            import json
             data = json.loads(content)
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid JSON file")
-
-        if not isinstance(data, list):
-            raise HTTPException(status_code=400, detail="JSON must be a list of coins")
-
-        for item in data:
-            try:
-                coin_in = CoinCreate(**item)
-                coin = Coin(**coin_in.model_dump(), owner_id=current_user.id)
-                db.add(coin)
-                inserted += 1
-            except Exception:
-                errors += 1
+            for item in data:
+                try:
+                    coin_in = CoinCreate(**item)
+                    db.add(Coin(**coin_in.model_dump(), owner_id=current_user.id))
+                    inserted += 1
+                except Exception:
+                    errors += 1
+        elif file.filename.endswith(".csv"):
+            reader = csv.DictReader(io.StringIO(content.decode("utf-8")))
+            for row in reader:
+                try:
+                    # Implement robust type conversion for CSV data
+                    if p := row.get("purchase_price"): row["purchase_price"] = float(p)
+                    if e := row.get("estimated_value"): row["estimated_value"] = float(e)
+                    if y := row.get("year"): row["year"] = int(y)
+                    if d := row.get("acquisition_date"): row["acquisition_date"] = datetime.fromisoformat(d)
+                    
+                    coin_in = CoinCreate(**row)
+                    db.add(Coin(**coin_in.model_dump(), owner_id=current_user.id))
+                    inserted += 1
+                except (ValueError, TypeError):
+                    errors += 1
+        else:
+            raise HTTPException(400, "Invalid file format. Use .json or .csv.")
+        
         db.commit()
-
-    elif file.filename.endswith(".csv"):
-        text = content.decode("utf-8")
-        reader = csv.DictReader(io.StringIO(text))
-        for row in reader:
-            try:
-                # adaptar conversão de tipos conforme seu CSV
-                if row.get("acquisition_date"):
-                    row["acquisition_date"] = datetime.fromisoformat(
-                        row["acquisition_date"]
-                    )
-                coin_in = CoinCreate(**row)
-                coin = Coin(**coin_in.model_dump())
-                db.add(coin)
-                inserted += 1
-            except Exception:
-                errors += 1
-        db.commit()
-    else:
-        raise HTTPException(status_code=400, detail="File must be .json or .csv")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Import failed: {e}")
 
     return {"inserted": inserted, "errors": errors}
 
-@router.get("/export")
-def export_coins(
-    format: str = Query("json", pattern="^(json|csv)$"),
+
+@router.get("/export/all")
+def export_to_file(
+    format: str = Query("json", enum=["json", "csv"]),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    coins = db.query(Coin).filter(Coin.owner_id == current_user.id).all()
-    data = [CoinRead.model_validate(c).model_dump() for c in coins]
+    query = select(Coin).where(Coin.owner_id == current_user.id)
+    coins = db.execute(query).scalars().all()
+    data = [CoinRead.model_validate(c).model_dump(mode="json") for c in coins]
 
     if format == "json":
         return JSONResponse(content=data)
 
-    # CSV
-    fieldnames = list(data[0].keys()) if data else []
-    output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=fieldnames)
-    writer.writeheader()
-    for row in data:
-        writer.writerow(row)
-    output.seek(0)
+    if not data:
+        return StreamingResponse(iter([""]), media_type="text/csv")
 
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=data[0].keys())
+    writer.writeheader()
+    writer.writerows(data)
+    output.seek(0)
+    
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
