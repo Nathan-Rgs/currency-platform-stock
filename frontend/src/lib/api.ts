@@ -19,29 +19,40 @@ api.interceptors.request.use((config) => {
 // Types
 export interface Coin {
   id: number
-  country: string
+  quantity: number
   year: number
-  face_value: number
-  currency: string
-  estimated_value: number
+  country: string
+  face_value: string
+  purchase_price?: number
+  estimated_value?: number
   originality: string
-  condition: string
-  description?: string
+  condition?: string
+  storage_location?: string
+  category?: string
+  acquisition_date?: string
+  acquisition_source?: string
+  notes?: string
   image_url_front?: string
   image_url_back?: string
+  owner_id: number
   created_at: string
   updated_at: string
 }
 
 export interface CoinCreate {
-  country: string
+  quantity?: number
   year: number
-  face_value: number
-  currency: string
-  estimated_value: number
+  country: string
+  face_value: string
+  purchase_price?: number
+  estimated_value?: number
   originality: string
-  condition: string
-  description?: string
+  condition?: string
+  storage_location?: string
+  category?: string
+  acquisition_date?: string
+  acquisition_source?: string
+  notes?: string
 }
 
 export interface PaginatedResponse<T> {
@@ -118,8 +129,8 @@ export const coinsApi = {
     return response.data
   },
 
-  update: async (id: number, data: CoinCreate): Promise<Coin> => {
-    const response = await api.put(`/coins/${id}`, data)
+  update: async (id: number, data: Partial<CoinCreate>): Promise<Coin> => {
+    const response = await api.patch(`/coins/${id}`, data)
     return response.data
   },
 

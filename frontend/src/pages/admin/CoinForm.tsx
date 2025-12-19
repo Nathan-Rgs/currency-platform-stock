@@ -15,9 +15,6 @@ import { ArrowLeft, ImageIcon, Loader2, Save } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 
-// Ajustado para bater com seu banco:
-// originality: "original" | "replica" | "unknown"
-// condition e category são strings livres no seu payload
 const originalityOptions = [
   { value: "original", label: "Original" },
   { value: "replica", label: "Réplica" },
@@ -28,7 +25,6 @@ type OriginalityValue = (typeof originalityOptions)[number]["value"]
 
 function toInputDateTimeLocal(iso?: string | null) {
   if (!iso) return ""
-  // aceita "2025-12-18T21:47:21.454233Z" ou sem Z
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ""
   const pad = (n: number) => String(n).padStart(2, "0")
@@ -42,7 +38,6 @@ function toInputDateTimeLocal(iso?: string | null) {
 
 function fromInputDateTimeLocal(value: string) {
   if (!value) return null
-  // HTML datetime-local retorna sem timezone; convertemos para ISO
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return null
   return d.toISOString()
@@ -53,6 +48,14 @@ function normalizeOriginality(value: any): OriginalityValue {
   if (v === "original") return "original"
   if (v === "replica") return "replica"
   return "unknown"
+}
+
+function resolveImageUrl(url?: string | null) {
+  if (!url) return null
+  const u = String(url).trim()
+  if (!u || u === "string") return null
+  if (u.startsWith("http://") || u.startsWith("https://")) return u
+  return `${String(API_URL).replace(/\/$/, "")}/${u.replace(/^\//, "")}`
 }
 
 export default function CoinForm() {
@@ -69,22 +72,9 @@ export default function CoinForm() {
   const [frontPreview, setFrontPreview] = useState<string | null>(null)
   const [backPreview, setBackPreview] = useState<string | null>(null)
 
-  // Campos alinhados com seu payload do banco
-  // year: number
-  // country: string
-  // face_value: string (ex: "1 Real")
-  // purchase_price?: number
-  // estimated_value?: number
-  // originality: "original" | "replica" | "unknown"
-  // condition?: string
-  // storage_location?: string
-  // category?: string
-  // acquisition_date?: string (ISO)
-  // acquisition_source?: string
-  // notes?: string
-  // image_url_front/back: string (no GET do coin)
   const [form, setForm] = useState<
     CoinCreate & {
+      quantity: number
       purchase_price?: number | null
       storage_location?: string
       category?: string
@@ -93,6 +83,7 @@ export default function CoinForm() {
       notes?: string
     }
   >({
+    quantity: 1,
     country: "",
     year: new Date().getFullYear(),
     face_value: "",
@@ -121,6 +112,7 @@ export default function CoinForm() {
       .then((coin: Coin & any) => {
         setForm((prev) => ({
           ...prev,
+          quantity: coin.quantity ?? 1,
           country: coin.country ?? "",
           year: Number(coin.year ?? new Date().getFullYear()),
           face_value: coin.face_value ?? "",
@@ -141,13 +133,9 @@ export default function CoinForm() {
           notes: coin.notes ?? "",
         }))
 
-        // Imagens conforme seu payload: image_url_front/back
-        if (coin.image_url_front) {
-          setFrontPreview(`${API_URL}/${coin.image_url_front.replace(/^\//, "")}`);
-        }
-        if (coin.image_url_back) {
-          setBackPreview(`${API_URL}/${coin.image_url_back.replace(/^\//, "")}`);
-        }
+        // Imagens: image_url_front/back (pode vir relativa ou absoluta)
+        setFrontPreview(resolveImageUrl(coin.image_url_front))
+        setBackPreview(resolveImageUrl(coin.image_url_back))
       })
       .catch(() => {
         toast({
@@ -192,18 +180,15 @@ export default function CoinForm() {
     try {
       let coin: Coin
 
-      // Garante que originality vai no formato do banco
       const payload: any = {
         ...form,
         originality: normalizeOriginality((form as any).originality),
       }
 
-      // acquisition_date: salva como ISO (ou null)
       if ("acquisition_date" in payload) {
         payload.acquisition_date = payload.acquisition_date || null
       }
 
-      // purchase_price pode ser null
       if ("purchase_price" in payload) {
         payload.purchase_price =
           payload.purchase_price === "" || payload.purchase_price === undefined
@@ -217,7 +202,6 @@ export default function CoinForm() {
         coin = await coinsApi.create(payload)
       }
 
-      // Upload images if selected
       if (frontImage || backImage) {
         await coinsApi.uploadImages(
           coin.id,
@@ -233,7 +217,7 @@ export default function CoinForm() {
           : "Moeda criada com sucesso.",
       })
       navigate("/admin/coins")
-    } catch (err) {
+    } catch {
       toast({
         title: "Erro",
         description: "Não foi possível salvar a moeda.",
@@ -288,6 +272,7 @@ export default function CoinForm() {
                     src={frontPreview}
                     alt="Frente"
                     className="h-full w-full object-cover"
+                    onError={() => setFrontPreview(null)}
                   />
                 ) : (
                   <div className="relative z-10 flex h-full w-full flex-col items-center justify-center">
@@ -318,6 +303,7 @@ export default function CoinForm() {
                     src={backPreview}
                     alt="Verso"
                     className="h-full w-full object-cover"
+                    onError={() => setBackPreview(null)}
                   />
                 ) : (
                   <div className="relative z-10 flex h-full w-full flex-col items-center justify-center">
@@ -382,6 +368,22 @@ export default function CoinForm() {
                   setForm({ ...form, face_value: e.target.value } as any)
                 }
                 placeholder='Ex: "1 Real", "10 Centavos"'
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantidade</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="1"
+                value={(form as any).quantity ?? 1}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    quantity: Number(e.target.value || 1),
+                  } as any)
+                }
               />
             </div>
 

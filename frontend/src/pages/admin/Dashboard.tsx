@@ -27,9 +27,9 @@ import {
 
 const COLORS = ["#d4a84b", "#b8923f", "#9c7c33", "#806627", "#64501b"]
 
-function formatCurrencyUSD(value: number) {
-  return `$${(value ?? 0).toLocaleString(undefined, {
-    minimumFractionDigits: 0,
+function formatCurrencyBRL(value: number) {
+  return `R$ ${Number(value ?? 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`
 }
@@ -248,14 +248,14 @@ export default function AdminDashboard() {
     },
     {
       title: "Valor Estimado",
-      value: formatCurrencyUSD(computed.totalEstimated),
+      value: formatCurrencyBRL(computed.totalEstimated),
       icon: DollarSign,
       color: "text-green-500",
       bgColor: "bg-green-500/10",
     },
     {
       title: "Valor Médio",
-      value: formatCurrencyUSD(computed.avgValue),
+      value: formatCurrencyBRL(computed.avgValue),
       icon: TrendingUp,
       color: "text-purple-500",
       bgColor: "bg-purple-500/10",
@@ -381,7 +381,7 @@ export default function AdminDashboard() {
               <div className="rounded-xl border border-border bg-muted/20 px-3 py-2">
                 <p className="text-xs text-muted-foreground">Valor médio</p>
                 <p className="font-semibold">
-                  {formatCurrencyUSD(computed.avgValue)}
+                  {formatCurrencyBRL(computed.avgValue)}
                 </p>
               </div>
             </div>

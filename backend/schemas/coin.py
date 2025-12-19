@@ -8,6 +8,7 @@ class BaseModelWithOrm(BaseModel):
 
 
 class CoinBase(BaseModel):
+    quantity: int = Field(1, ge=1, description="Quantidade de moedas iguais.")
     year: int = Field(..., gt=0, example=1994, description="Ano de cunhagem da moeda.")
     country: str = Field(..., max_length=100, example="Brasil")
     face_value: str = Field(..., max_length=100, example="1 Real")
@@ -27,6 +28,7 @@ class CoinCreate(CoinBase):
     pass
 
 class CoinUpdate(BaseModel):
+    quantity: Optional[int] = Field(None, ge=1)
     year: Optional[int] = Field(None, gt=0)
     country: Optional[str] = Field(None, max_length=100)
     face_value: Optional[str] = Field(None, max_length=100)

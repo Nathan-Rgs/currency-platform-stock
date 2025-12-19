@@ -34,9 +34,9 @@ import { Link } from "react-router-dom"
 
 type Originality = "original" | "replica" | "unknown" | string
 
-function formatCurrencyUSD(value: number) {
-  return `$${(value ?? 0).toLocaleString(undefined, {
-    minimumFractionDigits: 0,
+function formatCurrencyBRL(value: number) {
+  return `R$ ${Number(value ?? 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`
 }
@@ -78,6 +78,7 @@ export default function CoinsList() {
       setCoins([
         {
           id: 1,
+          quantity: 1,
           owner_id: 3,
           year: 1994,
           country: "Brasil",
@@ -192,6 +193,7 @@ export default function CoinsList() {
                 <TableHead>País</TableHead>
                 <TableHead>Ano</TableHead>
                 <TableHead>Valor de Face</TableHead>
+                <TableHead>Quantidade</TableHead>
                 <TableHead>Originalidade</TableHead>
                 <TableHead>Valor Estimado</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -206,6 +208,7 @@ export default function CoinsList() {
 
                   {/* Agora bate com seu banco: face_value é string (ex: "1 Real") */}
                   <TableCell>{coin.face_value ?? "—"}</TableCell>
+                  <TableCell>{coin.quantity ?? 1}</TableCell>
 
                   {/* originality: original|replica|unknown */}
                   <TableCell>
@@ -219,7 +222,7 @@ export default function CoinsList() {
                   </TableCell>
 
                   <TableCell className="font-display font-semibold text-gold">
-                    {formatCurrencyUSD(Number(coin.estimated_value ?? 0))}
+                    {formatCurrencyBRL(Number(coin.estimated_value ?? 0))}
                   </TableCell>
 
                   <TableCell className="text-right">

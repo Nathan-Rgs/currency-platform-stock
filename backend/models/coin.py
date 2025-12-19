@@ -26,6 +26,7 @@ class OriginalityEnum(str, enum.Enum):
 
 class Coin(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    quantity: Mapped[int] = mapped_column(Integer)
     year: Mapped[int] = mapped_column(index=True)
     country: Mapped[str] = mapped_column(String(100), index=True)
     face_value: Mapped[str] = mapped_column(String(100))
