@@ -1,0 +1,46 @@
+# Byte-code files
+*.pyc
+__pycache__/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# Editor/IDE specific files
+.vscode/
+.idea/
+*.swp
+*.bak
+*~
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Environment variables and secrets
+.env
+.env.*
+secrets.py
+config.py  # If it contains sensitive information
+
+# Database files (if using local files like SQLite)
+*.sqlite3
+*.db
+
+# Test reports and coverage files
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+.mypy_cache/
+.ruff_cache/
+alembic/versions/__pycache__/
