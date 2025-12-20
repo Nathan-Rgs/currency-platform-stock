@@ -56,6 +56,12 @@ function originalityBadgeClasses(value: Originality) {
   return "bg-muted text-muted-foreground"
 }
 
+function truncate(text: string, max = 60) {
+  const t = String(text ?? "").trim()
+  if (!t) return "—"
+  return t.length > max ? `${t.slice(0, max)}…` : t
+}
+
 export default function CoinsList() {
   const [coins, setCoins] = useState<Coin[]>([])
   const [loading, setLoading] = useState(true)
@@ -196,6 +202,8 @@ export default function CoinsList() {
                 <TableHead>Quantidade</TableHead>
                 <TableHead>Originalidade</TableHead>
                 <TableHead>Valor Estimado</TableHead>
+                {/* NOVO: notes ao final */}
+                <TableHead>Notas</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -206,8 +214,9 @@ export default function CoinsList() {
                   <TableCell className="font-medium">{coin.country}</TableCell>
                   <TableCell>{coin.year}</TableCell>
 
-                  {/* Agora bate com seu banco: face_value é string (ex: "1 Real") */}
+                  {/* face_value é string (ex: "1 Real") */}
                   <TableCell>{coin.face_value ?? "—"}</TableCell>
+
                   <TableCell>{coin.quantity ?? 1}</TableCell>
 
                   {/* originality: original|replica|unknown */}
@@ -223,6 +232,14 @@ export default function CoinsList() {
 
                   <TableCell className="font-display font-semibold text-gold">
                     {formatCurrencyBRL(Number(coin.estimated_value ?? 0))}
+                  </TableCell>
+
+                  {/* NOVO: coluna notes (truncada + tooltip) */}
+                  <TableCell
+                    className="max-w-[420px] truncate text-muted-foreground"
+                    title={String(coin.notes ?? "").trim() || ""}
+                  >
+                    {truncate(coin.notes, 80)}
                   </TableCell>
 
                   <TableCell className="text-right">
