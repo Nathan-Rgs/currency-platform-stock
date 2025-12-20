@@ -110,7 +110,6 @@ export const coinsApi = {
     search?: string
   }): Promise<PaginatedResponse<Coin>> => {
     const response = await api.get("/coins", { params })
-    // Adapt backend response to frontend interface
     const { data, meta } = response.data
     return {
       items: data,
@@ -126,20 +125,85 @@ export const coinsApi = {
     return response.data
   },
 
-  create: async (data: CoinCreate): Promise<Coin> => {
-    const response = await api.post("/coins", data)
+  create: async (
+    data: CoinCreate,
+    frontImage: File,
+    backImage?: File
+  ): Promise<Coin> => {
+    const formData = new FormData()
+
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        const value = (data as any)[key]
+        if (value !== undefined && value !== null) {
+          // acquisition_date no seu type é string, então só manda string
+          formData.append(key, String(value))
+        }
+      }
+    }
+
+    formData.append("front_image", frontImage)
+    if (backImage) formData.append("back_image", backImage)
+
+    const response = await api.post("/coins", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
     return response.data
   },
 
-  update: async (id: number, data: Partial<CoinCreate>): Promise<Coin> => {
-    const response = await api.patch(`/coins/${id}`, data)
+  update: async (
+    id: number,
+    data: Partial<CoinCreate>,
+    frontImage?: File,
+    backImage?: File
+  ): Promise<Coin> => {
+    const formData = new FormData()
+
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        const value = (data as any)[key]
+        if (value !== undefined && value !== null) {
+          formData.append(key, String(value))
+        }
+      }
+    }
+
+    if (frontImage) formData.append("front_image", frontImage)
+    if (backImage) formData.append("back_image", backImage)
+
+    const response = await api.put(`/coins/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
     return response.data
   },
 
-  delete: async (id: number): Promise<void> => {
-    await api.delete(`/coins/${id}`)
+  partialUpdate: async (
+    id: number,
+    data: Partial<CoinCreate>,
+    frontImage?: File,
+    backImage?: File
+  ): Promise<Coin> => {
+    const formData = new FormData()
+
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        const value = (data as any)[key]
+        if (value !== undefined && value !== null) {
+          formData.append(key, String(value))
+        }
+      }
+    }
+
+    if (frontImage) formData.append("front_image", frontImage)
+    if (backImage) formData.append("back_image", backImage)
+
+    const response = await api.patch(`/coins/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    return response.data
   },
 
+  // ✅ novo endpoint: /coins/{id}/upload-images
   uploadImages: async (
     id: number,
     frontImage?: File,
@@ -153,6 +217,10 @@ export const coinsApi = {
       headers: { "Content-Type": "multipart/form-data" },
     })
     return response.data
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/coins/${id}`)
   },
 }
 

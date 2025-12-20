@@ -28,5 +28,8 @@ orjson>=3.10,<3.11
 # Env helpers
 python-dotenv>=1.0,<1.1
 
+# Supabase client
+supabase>=2.4,<2.5
+
 # Logging (opcional)
 loguru>=0.7,<0.8

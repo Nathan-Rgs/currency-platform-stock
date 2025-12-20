@@ -35,7 +35,7 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-app.mount(f"/{MEDIA_DIR}", StaticFiles(directory=MEDIA_DIR), name="media")
+
 
 api_router = APIRouter(prefix=settings.API_V1_PREFIX)
 api_router.include_router(auth.router)
