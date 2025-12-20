@@ -64,6 +64,8 @@ export interface PaginatedResponse<T> {
 }
 
 export interface DashboardSummary {
+  total_replicas: number
+  total_originals: number
   total_coins: number
   total_countries: number
   total_estimated_value: number
