@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
-from core.storage import save_file
+from core.storage import delete_file, save_file
 from models.coin import Coin
 from repositories import coin_repo
 from schemas.coin import CoinCreate, CoinUpdate
@@ -60,34 +60,41 @@ async def update_coin(
     if not db_coin:
         return None
 
-    if partial:
-        update_data = coin_update.model_dump(exclude_unset=True, exclude_none=True)
-    else:
-        update_data = coin_update.model_dump(exclude_unset=True)
+    # guarda paths antigos
+    old_front_path = db_coin.image_url_front
+    old_back_path = db_coin.image_url_back
 
-    for key, value in update_data.items():
-        setattr(db_coin, key, value)
+    ... # aplica update_data
 
+    new_front_path = None
+    new_back_path = None
     front_signed_url = None
     back_signed_url = None
 
     if front_image:
-        front_signed_url, front_path = await save_file(front_image, folder="coins", return_path=True)
-        db_coin.image_url_front = front_path  # salva PATH
+        front_signed_url, new_front_path = await save_file(front_image, folder="coins", return_path=True)
+        db_coin.image_url_front = new_front_path  # salva path
+
     if back_image:
-        back_signed_url, back_path = await save_file(back_image, folder="coins", return_path=True)
-        db_coin.image_url_back = back_path  # salva PATH
+        back_signed_url, new_back_path = await save_file(back_image, folder="coins", return_path=True)
+        db_coin.image_url_back = new_back_path  # salva path
 
     updated = coin_repo.update_coin(db, db_coin)
 
-    # opcional: retorno já com URL válida (sem persistir)
+    # apaga arquivos antigos (só se realmente trocou)
+    if front_image and old_front_path and new_front_path and old_front_path != new_front_path:
+        await delete_file(old_front_path)
+
+    if back_image and old_back_path and new_back_path and old_back_path != new_back_path:
+        await delete_file(old_back_path)
+
+    # opcional: resposta já com URL válida
     if front_signed_url:
         updated.image_url_front = front_signed_url
     if back_signed_url:
         updated.image_url_back = back_signed_url
 
     return updated
-
 
 def delete_coin(db: Session, coin_id: int) -> Coin | None:
     return coin_repo.delete_coin(db, coin_id)
