@@ -181,10 +181,8 @@ export default function AdminDashboard() {
       (a, b) => (b.count ?? 0) - (a.count ?? 0)
     )
 
-    const originals =
-      byOriginality.find((o: any) => o.originality === "Original")?.count ?? 0
-    const replicas =
-      byOriginality.find((o: any) => o.originality === "Réplica")?.count ?? 0
+    const originals = summary.total_originals ?? 0
+    const replicas = summary.total_replicas ?? 0
 
     const originalsPct = totalCoins > 0 ? (originals / totalCoins) * 100 : 0
     const replicasPct = totalCoins > 0 ? (replicas / totalCoins) * 100 : 0
