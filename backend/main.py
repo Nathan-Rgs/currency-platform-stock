@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from core.config import settings
-from routers import auth, coins, dashboard, health
+from routers import auth, coins, dashboard, health, audit_logs
 
 MEDIA_DIR = "media"
 
@@ -41,6 +41,7 @@ api_router = APIRouter(prefix=settings.API_V1_PREFIX)
 api_router.include_router(auth.router)
 api_router.include_router(coins.router)
 api_router.include_router(dashboard.router)
+api_router.include_router(audit_logs.router)
 
 app.include_router(health.router)
 app.include_router(api_router)

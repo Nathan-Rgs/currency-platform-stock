@@ -28,6 +28,9 @@ from schemas.common import PaginatedResponse, PaginationMeta
 router = APIRouter(prefix="/coins", tags=["coins"])
 MEDIA_DIR = "media/coins"
 
+from services.audit_service import AuditService, get_audit_service
+from schemas.audit_log import CoinAuditLogCreate
+from models.audit_log import AuditLogAction
 
 def get_coin_or_404(db: Session, coin_id: int, user_id: int) -> Coin:
     """Busca uma moeda pelo ID, garantindo que ela pertença ao usuário. Falha com 404 caso contrário."""
@@ -39,17 +42,26 @@ def get_coin_or_404(db: Session, coin_id: int, user_id: int) -> Coin:
         )
     return coin
 
-
 @router.post("", response_model=CoinRead, status_code=status.HTTP_201_CREATED)
 def create_coin(
     coin_in: CoinCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    audit_service: AuditService = Depends(get_audit_service),
 ):
     coin = Coin(**coin_in.model_dump(), owner_id=current_user.id)
     db.add(coin)
     db.commit()
     db.refresh(coin)
+
+    audit_log = CoinAuditLogCreate(
+        action=AuditLogAction.CREATE,
+        after=CoinRead.model_validate(coin).model_dump(mode="json"),
+        coin_id=coin.id,
+        delta_quantity=coin.quantity,
+    )
+    audit_service.create_audit_log(actor=current_user, audit_log_in=audit_log)
+
     return coin
 
 
@@ -118,18 +130,37 @@ def get_coin_by_id(
     return coin
 
 
+def coin_to_dict(coin: Coin) -> dict:
+    return CoinRead.model_validate(coin).model_dump(mode="json")
+
 @router.put("/{coin_id}", response_model=CoinRead)
 def update_coin(
     coin_id: int,
     coin_in: CoinCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    audit_service: AuditService = Depends(get_audit_service),
 ):
     coin = get_coin_or_404(db, coin_id, current_user.id)
+    before_state = coin_to_dict(coin)
+    delta_quantity = coin_in.quantity - coin.quantity
+
     for field, value in coin_in.model_dump().items():
         setattr(coin, field, value)
+    
     db.commit()
     db.refresh(coin)
+    after_state = coin_to_dict(coin)
+
+    audit_log = CoinAuditLogCreate(
+        action=AuditLogAction.UPDATE,
+        before=before_state,
+        after=after_state,
+        coin_id=coin.id,
+        delta_quantity=delta_quantity,
+    )
+    audit_service.create_audit_log(actor=current_user, audit_log_in=audit_log)
+
     return coin
 
 
@@ -139,13 +170,32 @@ def partial_update_coin(
     coin_in: CoinUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    audit_service: AuditService = Depends(get_audit_service),
 ):
     coin = get_coin_or_404(db, coin_id, current_user.id)
+    before_state = coin_to_dict(coin)
     update_data = coin_in.model_dump(exclude_unset=True)
+    
+    delta_quantity = None
+    if "quantity" in update_data:
+        delta_quantity = update_data["quantity"] - coin.quantity
+
     for field, value in update_data.items():
         setattr(coin, field, value)
+
     db.commit()
     db.refresh(coin)
+    after_state = coin_to_dict(coin)
+
+    audit_log = CoinAuditLogCreate(
+        action=AuditLogAction.UPDATE,
+        before=before_state,
+        after=after_state,
+        coin_id=coin.id,
+        delta_quantity=delta_quantity,
+    )
+    audit_service.create_audit_log(actor=current_user, audit_log_in=audit_log)
+
     return coin
 
 
@@ -154,8 +204,20 @@ def delete_coin(
     coin_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    audit_service: AuditService = Depends(get_audit_service),
 ):
     coin = get_coin_or_404(db, coin_id, current_user.id)
+    before_state = coin_to_dict(coin)
+    delta_quantity = -coin.quantity
+
+    audit_log = CoinAuditLogCreate(
+        action=AuditLogAction.DELETE,
+        before=before_state,
+        coin_id=coin.id,
+        delta_quantity=delta_quantity,
+    )
+    audit_service.create_audit_log(actor=current_user, audit_log_in=audit_log)
+
     db.delete(coin)
     db.commit()
     return
@@ -198,9 +260,11 @@ def import_from_file(
     file: UploadFile,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    audit_service: AuditService = Depends(get_audit_service),
 ):
     content = file.file.read()
     inserted, errors = 0, 0
+    coins_to_add = []
 
     try:
         if file.filename.endswith(".json"):
@@ -209,8 +273,7 @@ def import_from_file(
             for item in data:
                 try:
                     coin_in = CoinCreate(**item)
-                    db.add(Coin(**coin_in.model_dump(), owner_id=current_user.id))
-                    inserted += 1
+                    coins_to_add.append(Coin(**coin_in.model_dump(), owner_id=current_user.id))
                 except Exception:
                     errors += 1
         elif file.filename.endswith(".csv"):
@@ -224,14 +287,27 @@ def import_from_file(
                     if d := row.get("acquisition_date"): row["acquisition_date"] = datetime.fromisoformat(d)
                     
                     coin_in = CoinCreate(**row)
-                    db.add(Coin(**coin_in.model_dump(), owner_id=current_user.id))
-                    inserted += 1
+                    coins_to_add.append(Coin(**coin_in.model_dump(), owner_id=current_user.id))
                 except (ValueError, TypeError):
                     errors += 1
         else:
             raise HTTPException(400, "Invalid file format. Use .json or .csv.")
-        
-        db.commit()
+
+        if coins_to_add:
+            db.add_all(coins_to_add)
+            db.commit()
+            inserted = len(coins_to_add)
+
+            for coin in coins_to_add:
+                db.refresh(coin)
+                audit_log = CoinAuditLogCreate(
+                    action=AuditLogAction.IMPORT,
+                    after=coin_to_dict(coin),
+                    coin_id=coin.id,
+                    delta_quantity=coin.quantity,
+                )
+                audit_service.create_audit_log(actor=current_user, audit_log_in=audit_log)
+
     except Exception as e:
         db.rollback()
         raise HTTPException(500, f"Import failed: {e}")
