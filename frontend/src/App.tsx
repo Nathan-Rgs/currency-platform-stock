@@ -10,6 +10,7 @@ import AdminLogin from "./pages/admin/Login";
 import AdminDashboard from "./pages/admin/Dashboard";
 import CoinsList from "./pages/admin/CoinsList";
 import CoinForm from "./pages/admin/CoinForm";
+import AuditLogsPage from "./pages/admin/AuditLogs";
 import { AdminLayout } from "./components/layout/AdminLayout";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +35,7 @@ const App = () => (
               <Route path="coins" element={<CoinsList />} />
               <Route path="coins/new" element={<CoinForm />} />
               <Route path="coins/edit/:id" element={<CoinForm />} />
+              <Route path="audit-logs" element={<AuditLogsPage />} />
             </Route>
 
             {/* Catch-all */}

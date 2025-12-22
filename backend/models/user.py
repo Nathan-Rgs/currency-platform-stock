@@ -9,6 +9,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String)
     display_name: Mapped[str | None] = mapped_column(String(100))
+    is_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

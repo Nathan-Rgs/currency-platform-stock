@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Coins, LayoutDashboard, LogOut, CircleDollarSign, Plus } from 'lucide-react';
+import { Coins, LayoutDashboard, LogOut, CircleDollarSign, Plus, ScrollText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -7,6 +7,7 @@ const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/coins', label: 'Gerenciar Moedas', icon: CircleDollarSign },
   { href: '/admin/coins/new', label: 'Adicionar Moeda', icon: Plus },
+  { href: '/admin/audit-logs', label: 'Logs de Auditoria', icon: ScrollText },
 ];
 
 export function AdminSidebar() {
