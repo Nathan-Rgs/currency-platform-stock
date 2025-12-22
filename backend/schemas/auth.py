@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 
 class UserLogin(BaseModel):
@@ -17,9 +18,30 @@ class UserRead(BaseModel):
     id: int
     email: EmailStr
     display_name: str | None
+    is_mfa_enabled: bool
     created_at: datetime
     updated_at: datetime
+
 
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class LoginResponse(BaseModel):
+    token: Optional[Token] = None
+    mfa_required: bool = False
+
+
+class MFALoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+    totp_code: str = Field(..., min_length=6, max_length=6)
+
+
+class MFASetupResponse(BaseModel):
+    provisioning_uri: str
+
+
+class MFAVerifyRequest(BaseModel):
+    totp_code: str = Field(..., min_length=6, max_length=6)

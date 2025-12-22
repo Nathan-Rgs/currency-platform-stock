@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
+from cryptography.fernet import Fernet
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 
@@ -16,6 +17,9 @@ from models.user import User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login", auto_error=False)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Initialize Fernet for encryption
+fernet = Fernet(settings.MFA_SECRET_KEY.encode())
 
 
 def hash_password(password: str) -> str:
@@ -44,6 +48,16 @@ def create_access_token(user_id: int, expires_delta: timedelta | None = None) ->
     return encoded_jwt
 
 
+def encrypt_data(data: str) -> str:
+    """Criptografa dados usando a chave de MFA."""
+    return fernet.encrypt(data.encode()).decode()
+
+
+def decrypt_data(encrypted_data: str) -> str:
+    """Descriptografa dados usando a chave de MFA."""
+    return fernet.decrypt(encrypted_data.encode()).decode()
+
+
 def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
@@ -56,6 +70,12 @@ def get_current_user(
     if token is None:
         return None
 
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
     try:
         payload = jwt.decode(
             token,
@@ -64,17 +84,48 @@ def get_current_user(
         )
         user_id_str: str | None = payload.get("sub")
         if user_id_str is None:
-            return None
+            raise credentials_exception
     except JWTError:
-        return None
+        raise credentials_exception
 
     try:
         user_id = int(user_id_str)
     except (ValueError, TypeError):
-        return None
+        raise credentials_exception
 
     user = db.get(User, user_id)
     if user is None:
-        return None
+        raise credentials_exception
 
     return user
+
+
+def get_current_active_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Dependência para obter o usuário autenticado.
+    Levanta uma exceção se o usuário não estiver autenticado.
+    """
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return current_user
+
+
+def get_current_admin_user(
+    current_user: User = Depends(get_current_active_user),
+) -> User:
+    """
+    Dependência para obter o usuário administrador autenticado.
+    Levanta uma exceção se o usuário não for um administrador.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user doesn't have enough privileges",
+        )
+    return current_user

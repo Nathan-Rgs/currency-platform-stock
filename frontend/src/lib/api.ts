@@ -74,9 +74,27 @@ export interface DashboardSummary {
   by_originality: { originality: string; count: number }[]
 }
 
+export interface Token {
+  access_token: string;
+  token_type: string;
+}
+
 export interface LoginResponse {
-  access_token: string
-  token_type: string
+  token?: Token;
+  mfa_required?: boolean;
+}
+
+export interface MfaSetupResponse {
+  provisioning_uri: string;
+}
+
+export interface User {
+  id: number;
+  email: string;
+  display_name: string | null;
+  is_mfa_enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 // Auth API
@@ -92,10 +110,35 @@ export const authApi = {
     return response.data
   },
 
+  getMe: async (): Promise<User> => {
+    const response = await api.get("/auth/users/me");
+    return response.data;
+  },
+
+  loginMfa: async (email: string, password: string, totp_code: string): Promise<Token> => {
+    const response = await api.post("/auth/login/mfa", { email, password, totp_code })
+    return response.data
+  },
+
   register: async (email: string, password: string) => {
     const response = await api.post("/auth/register", { email, password })
     return response.data
   },
+
+  setupMfa: async (): Promise<MfaSetupResponse> => {
+    const response = await api.post("/auth/mfa/setup");
+    return response.data;
+  },
+
+  verifyMfa: async (totp_code: string): Promise<{ detail: string }> => {
+    const response = await api.post("/auth/mfa/verify", { totp_code });
+    return response.data;
+  },
+
+  disableMfa: async (totp_code: string): Promise<{ detail: string }> => {
+    const response = await api.post("/auth/mfa/disable", { totp_code });
+    return response.data;
+  }
 }
 
 // Coins API
