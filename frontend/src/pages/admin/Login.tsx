@@ -1,92 +1,91 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { Coins, Loader2, Eye, EyeOff } from 'lucide-react';
-import { authApi } from '@/lib/api';
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { useAuth } from "@/contexts/AuthContext"
+import { useToast } from "@/hooks/use-toast"
+import { authApi } from "@/lib/api"
+import { Coins, Eye, EyeOff, Loader2 } from "lucide-react"
+import { useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [totpCode, setTotpCode] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [isWaitingForMfa, setIsWaitingForMfa] = useState(false);
-  const { login, finishMfaLogin } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [totpCode, setTotpCode] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [isWaitingForMfa, setIsWaitingForMfa] = useState(false)
+  const { login, finishMfaLogin } = useAuth()
+  const navigate = useNavigate()
+  const { toast } = useToast()
 
   const handlePrimaryLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     if (!email || !password) {
       toast({
-        title: 'Erro',
-        description: 'Por favor, preencha todos os campos.',
-        variant: 'destructive',
-      });
-      return;
+        title: "Erro",
+        description: "Por favor, preencha todos os campos.",
+        variant: "destructive",
+      })
+      return
     }
-    setLoading(true);
+    setLoading(true)
     try {
-      const response = await login(email, password);
+      const response = await login(email, password)
       if (response.mfa_required) {
-        setIsWaitingForMfa(true);
+        setIsWaitingForMfa(true)
       } else {
         toast({
-          title: 'Bem-vindo!',
-          description: 'Login realizado com sucesso.',
-        });
-        navigate('/admin/dashboard');
+          title: "Bem-vindo!",
+          description: "Login realizado com sucesso.",
+        })
+        navigate("/admin/dashboard")
       }
     } catch (err: any) {
       toast({
-        title: 'Erro de autenticação',
-        description: err.response?.data?.detail || 'Email ou senha inválidos.',
-        variant: 'destructive',
-      });
+        title: "Erro de autenticação",
+        description: err.response?.data?.detail || "Email ou senha inválidos.",
+        variant: "destructive",
+      })
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleMfaLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     if (!totpCode) {
       toast({
-        title: 'Erro',
-        description: 'Por favor, insira o código de verificação.',
-        variant: 'destructive',
-      });
-      return;
+        title: "Erro",
+        description: "Por favor, insira o código de verificação.",
+        variant: "destructive",
+      })
+      return
     }
-    setLoading(true);
+    setLoading(true)
     try {
-      const token = await authApi.loginMfa(email, password, totpCode);
-      finishMfaLogin(token);
+      const token = await authApi.loginMfa(email, password, totpCode)
+      finishMfaLogin(token)
       toast({
-        title: 'Bem-vindo!',
-        description: 'Login realizado com sucesso.',
-      });
-      navigate('/admin/dashboard');
+        title: "Bem-vindo!",
+        description: "Login realizado com sucesso.",
+      })
+      navigate("/admin/dashboard")
     } catch (err: any) {
       toast({
-        title: 'Erro de autenticação',
-        description: err.response?.data?.detail || 'Código MFA inválido.',
-        variant: 'destructive',
-      });
+        title: "Erro de autenticação",
+        description: err.response?.data?.detail || "Código MFA inválido.",
+        variant: "destructive",
+      })
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
-
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-primary px-4">
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-      
+
       <div className="relative w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -130,7 +129,7 @@ export default function AdminLogin() {
                   <div className="relative">
                     <Input
                       id="password"
-                      type={showPassword ? 'text' : 'password'}
+                      type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -150,8 +149,20 @@ export default function AdminLogin() {
                     </button>
                   </div>
                 </div>
-                <Button type="submit" variant="gold" size="xl" className="w-full" disabled={loading}>
-                  {loading ? (<><Loader2 className="h-5 w-5 animate-spin" /> Entrando...</>) : 'Entrar'}
+                <Button
+                  type="submit"
+                  variant="gold"
+                  size="xl"
+                  className="w-full"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" /> Entrando...
+                    </>
+                  ) : (
+                    "Entrar"
+                  )}
                 </Button>
               </form>
             </>
@@ -177,10 +188,25 @@ export default function AdminLogin() {
                     disabled={loading}
                     className="h-12 text-center tracking-widest text-lg"
                     maxLength={6}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                   />
                 </div>
-                <Button type="submit" variant="gold" size="xl" className="w-full" disabled={loading}>
-                  {loading ? (<><Loader2 className="h-5 w-5 animate-spin" /> Verificando...</>) : 'Verificar e Entrar'}
+                <Button
+                  type="submit"
+                  variant="gold"
+                  size="xl"
+                  className="w-full"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />{" "}
+                      Verificando...
+                    </>
+                  ) : (
+                    "Verificar e Entrar"
+                  )}
                 </Button>
               </form>
             </>
@@ -197,5 +223,5 @@ export default function AdminLogin() {
         </div>
       </div>
     </div>
-  );
+  )
 }

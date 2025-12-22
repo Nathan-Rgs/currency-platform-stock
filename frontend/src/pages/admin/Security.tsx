@@ -1,68 +1,80 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { authApi } from "@/lib/api";
-import { Loader2, ShieldCheck, ShieldOff } from "lucide-react";
-import QRCode from "qrcode.react";
+} from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useToast } from "@/hooks/use-toast"
+import { authApi } from "@/lib/api"
+import { Loader2, ShieldCheck, ShieldOff } from "lucide-react"
+import QRCode from "qrcode.react"
+import { useEffect, useState } from "react"
 
 export default function SecurityPage() {
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isMfaEnabled, setIsMfaEnabled] = useState<boolean | null>(null);
-  const [setupUri, setSetupUri] = useState<string | null>(null);
-  const [verifyCode, setVerifyCode] = useState("");
-  const [showSetupDialog, setShowSetupDialog] = useState(false);
-  const [showDisableDialog, setShowDisableDialog] = useState(false);
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(false)
+  const [isMfaEnabled, setIsMfaEnabled] = useState<boolean | null>(null)
+  const [setupUri, setSetupUri] = useState<string | null>(null)
+  const [verifyCode, setVerifyCode] = useState("")
+  const [showSetupDialog, setShowSetupDialog] = useState(false)
+  const [showDisableDialog, setShowDisableDialog] = useState(false)
 
   useEffect(() => {
     const fetchMfaStatus = async () => {
       try {
-        const user = await authApi.getMe();
-        setIsMfaEnabled(user.is_mfa_enabled);
+        const user = await authApi.getMe()
+        setIsMfaEnabled(user.is_mfa_enabled)
       } catch (error) {
         toast({
           title: "Erro ao buscar status do MFA",
           variant: "destructive",
-        });
+        })
       }
-    };
-    fetchMfaStatus();
-  }, [toast]);
+    }
+    fetchMfaStatus()
+  }, [toast])
 
   const handleEnableMfa = async () => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const response = await authApi.setupMfa();
-      setSetupUri(response.provisioning_uri);
-      setShowSetupDialog(true);
+      const response = await authApi.setupMfa()
+      setSetupUri(response.provisioning_uri)
+      setShowSetupDialog(true)
     } catch (error: any) {
+      let description =
+        error?.response?.data?.detail || "Ocorreu um erro ao configurar o MFA."
+      // Erro de conflito, por exemplo, MFA já habilitado
+      if (error?.response?.status === 409) {
+        description =
+          error?.response?.data?.detail ||
+          "A autenticação de múltiplos fatores já está habilitada para esta conta."
+      } else if (error?.request && !error?.response) {
+        // Erro de rede/sem resposta do servidor
+        description =
+          "Não foi possível se conectar ao servidor. Verifique sua conexão com a internet e tente novamente."
+      }
       toast({
         title: "Erro ao configurar MFA",
-        description: error.response?.data?.detail || "Ocorreu um erro.",
+        description,
         variant: "destructive",
-      });
+      })
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const handleVerifyMfa = async () => {
     if (!verifyCode) {
@@ -70,29 +82,31 @@ export default function SecurityPage() {
         title: "Erro",
         description: "Por favor, insira o código de verificação.",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      await authApi.verifyMfa(verifyCode);
+      await authApi.verifyMfa(verifyCode)
       toast({
         title: "Sucesso!",
         description: "A autenticação de múltiplos fatores foi ativada.",
-      });
-      setIsMfaEnabled(true);
-      setShowSetupDialog(false);
-      setVerifyCode("");
+      })
+      setIsMfaEnabled(true)
+      setShowSetupDialog(false)
+      setSetupUri(null)
+      setVerifyCode("")
     } catch (error: any) {
       toast({
         title: "Erro na verificação",
-        description: error.response?.data?.detail || "Código inválido ou expirado.",
+        description:
+          error.response?.data?.detail || "Código inválido ou expirado.",
         variant: "destructive",
-      });
+      })
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const handleDisableMfa = async () => {
     if (!verifyCode) {
@@ -100,33 +114,34 @@ export default function SecurityPage() {
         title: "Erro",
         description: "Por favor, insira o código de verificação atual.",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      await authApi.disableMfa(verifyCode);
+      await authApi.disableMfa(verifyCode)
       toast({
         title: "Sucesso!",
         description: "A autenticação de múltiplos fatores foi desativada.",
-      });
-      setIsMfaEnabled(false);
-      setShowDisableDialog(false);
-      setVerifyCode("");
+      })
+      setIsMfaEnabled(false)
+      setShowDisableDialog(false)
+      setVerifyCode("")
     } catch (error: any) {
       toast({
         title: "Erro ao desativar",
-        description: error.response?.data?.detail || "Código inválido ou erro inesperado.",
+        description:
+          error.response?.data?.detail || "Código inválido ou erro inesperado.",
         variant: "destructive",
-      });
+      })
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const renderStatus = () => {
     if (isMfaEnabled === null) {
-      return <Skeleton className="h-8 w-48" />;
+      return <Skeleton className="h-8 w-48" />
     }
     if (isMfaEnabled) {
       return (
@@ -147,7 +162,7 @@ export default function SecurityPage() {
             )}
           </Button>
         </div>
-      );
+      )
     }
     return (
       <div className="flex items-center gap-4">
@@ -163,8 +178,8 @@ export default function SecurityPage() {
           )}
         </Button>
       </div>
-    );
-  };
+    )
+  }
 
   return (
     <div className="p-4 md:p-8">
@@ -205,13 +220,12 @@ export default function SecurityPage() {
               placeholder="123456"
               value={verifyCode}
               onChange={(e) => setVerifyCode(e.target.value)}
+              inputMode="numeric"
+              pattern="[0-9]*"
             />
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowSetupDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowSetupDialog(false)}>
               Cancelar
             </Button>
             <Button onClick={handleVerifyMfa} disabled={isLoading}>
@@ -268,5 +282,5 @@ export default function SecurityPage() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

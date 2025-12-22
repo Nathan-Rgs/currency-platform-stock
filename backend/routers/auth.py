@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta, timezone
+
+import pyotp
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-import pyotp
 
 from core.database import get_db
 from core.security import (
@@ -49,6 +50,30 @@ def _totp_from_encrypted_secret(encrypted_secret: str) -> pyotp.TOTP:
     return pyotp.TOTP(decrypted)
 
 
+def _raise_if_locked(user: User) -> None:
+    now_utc = datetime.now(timezone.utc)
+    if user.lockout_until and user.lockout_until > now_utc:
+        minutes_left = int((user.lockout_until - now_utc).total_seconds() / 60)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Account locked. Try again after {minutes_left} minutes.",
+        )
+
+
+def _register_failed_attempt(db: Session, user: User) -> None:
+    now_utc = datetime.now(timezone.utc)
+    user.failed_login_attempts += 1
+    if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
+        user.lockout_until = now_utc + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+    db.commit()
+
+
+def _reset_lockout(db: Session, user: User) -> None:
+    user.failed_login_attempts = 0
+    user.lockout_until = None
+    db.commit()
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserRead)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
     query = select(User).where(User.email == user_in.email)
@@ -85,34 +110,21 @@ def login(
             detail="Incorrect username or password",
         )
 
-    now_utc = datetime.now(timezone.utc)
-    if user.lockout_until and user.lockout_until > now_utc:
-        minutes_left = int((user.lockout_until - now_utc).total_seconds() / 60)
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Account locked. Try again after {minutes_left} minutes.",
-        )
+    _raise_if_locked(user)
 
     if not verify_password(form_data.password, user.hashed_password):
-        user.failed_login_attempts += 1
-        if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
-            user.lockout_until = now_utc + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
-        db.commit()
+        _register_failed_attempt(db, user)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
         )
 
+    # Password verificado com sucesso: sempre resetar tentativas e lockout
+    _reset_lockout(db, user)
+
     # Se MFA estiver habilitado, não devolve token aqui
     if user.is_mfa_enabled:
         return LoginResponse(mfa_required=True)
-
-    user.failed_login_attempts = 0
-    user.lockout_until = None
-    db.commit()
-
-    access_token = create_access_token(user_id=user.id)
-    return LoginResponse(token=Token(access_token=access_token))
 
 
 @router.post("/login/mfa", response_model=Token)
@@ -120,10 +132,27 @@ def login_mfa(
     mfa_login_data: MFALoginRequest,
     db: Session = Depends(get_db),
 ):
+    """
+    Correções:
+    1) Aplica lockout check ANTES de processar MFA, impedindo bypass via /login/mfa.
+    2) Implementa tracking/lockout também para falhas de TOTP (brute-force).
+    """
     query = select(User).where(User.email == mfa_login_data.email)
     user = db.execute(query).scalars().first()
 
-    if not user or not verify_password(mfa_login_data.password, user.hashed_password):
+    # Mantém resposta genérica para não vazar existência de conta
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
+
+    # 1) Bloqueio deve ser verificado antes de qualquer processamento de senha/MFA
+    _raise_if_locked(user)
+
+    # Senha errada também deve contar falha aqui (antes não contava)
+    if not verify_password(mfa_login_data.password, user.hashed_password):
+        _register_failed_attempt(db, user)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -138,15 +167,16 @@ def login_mfa(
     totp = _totp_from_encrypted_secret(user.mfa_secret)
     code = _normalize_totp_code(mfa_login_data.totp_code)
 
+    # 2) TOTP inválido conta tentativa e pode travar a conta
     if not totp.verify(code, valid_window=1):
+        _register_failed_attempt(db, user)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid TOTP code.",
         )
 
-    user.failed_login_attempts = 0
-    user.lockout_until = None
-    db.commit()
+    # Sucesso total (senha + MFA): reset de tentativas/lockout
+    _reset_lockout(db, user)
 
     access_token = create_access_token(user_id=user.id)
     return Token(access_token=access_token)
