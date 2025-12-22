@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from sqlalchemy import DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
@@ -10,6 +10,14 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String)
     display_name: Mapped[str | None] = mapped_column(String(100))
     is_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+    # Security
+    failed_login_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
+    lockout_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    mfa_secret: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    is_mfa_enabled: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
