@@ -5,8 +5,7 @@ from models.coin import OriginalityEnum
 
 class BaseModelWithOrm(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
-
+    
 class CoinBase(BaseModel):
     quantity: int = Field(1, ge=1, description="Quantidade de moedas iguais.")
     year: int = Field(..., gt=0, example=1994, description="Ano de cunhagem da moeda.")
@@ -49,3 +48,8 @@ class CoinRead(BaseModelWithOrm, CoinBase):
     owner_id: int
     created_at: datetime
     updated_at: datetime
+
+
+class CoinAdjust(BaseModel):
+    delta_quantity: int
+    note: str | None = None

@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { Coin, coinsApi, PaginatedResponse } from "@/lib/api"
+import { Coin, coinsApi } from "@/lib/api"
 import {
   ChevronLeft,
   ChevronRight,
@@ -76,9 +76,13 @@ export default function CoinsList() {
       const params: Record<string, any> = { page, page_size: 10 }
       if (search) params.search = search
 
-      const response: PaginatedResponse<Coin> = await coinsApi.list(params)
-      setCoins(response.items)
-      setPagination({ page: response.page, totalPages: response.total_pages })
+      const response = await coinsApi.list(params)
+      console.log("Coins fetched:", response)
+      setCoins(response.data)
+      setPagination({
+        page: response.meta.page,
+        totalPages: response.meta.total_pages,
+      })
     } catch (err) {
       // Demo data alinhado ao seu payload do banco
       setCoins([

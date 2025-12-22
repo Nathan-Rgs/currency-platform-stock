@@ -121,14 +121,13 @@ const Index = () => {
 
       const response: PaginatedResponse<Coin> = await coinsApi.list(params)
 
-      setCoins(response.items ?? [])
+      setCoins(response.data ?? [])
       setPagination({
-        page: response.page ?? page,
-        totalPages: response.total_pages ?? 1,
-        total: response.total ?? response.items?.length ?? 0,
+        page: response.meta?.page ?? page,
+        totalPages: response.meta?.total_pages ?? 1,
       })
 
-      mergeCountries(response.items ?? [])
+      mergeCountries(response.data ?? [])
     } catch (err) {
       setError(
         "Não foi possível carregar as moedas. Verifique se o servidor está funcionando."

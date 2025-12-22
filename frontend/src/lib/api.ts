@@ -56,11 +56,32 @@ export interface CoinCreate {
 }
 
 export interface PaginatedResponse<T> {
-  items: T[]
-  total: number
-  page: number
-  page_size: number
-  total_pages: number
+  data: T[]
+  meta: {
+    page: number
+    page_size: number
+    total_items: number
+    total_pages: number
+  }
+}
+
+export interface CoinAuditLog {
+  id: number
+  coin_id: number | null
+  action: string
+  delta_quantity: number | null
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  note: string | null
+  actor_user_id: number | null
+  actor_email: string | null
+  created_at: string
+  coin: Coin | null
+}
+
+export interface CoinAdjust {
+  delta_quantity: number
+  note?: string
 }
 
 export interface DashboardSummary {
@@ -151,17 +172,11 @@ export const coinsApi = {
     year_to?: number
     originality?: string
     search?: string
-  }): Promise<PaginatedResponse<Coin>> => {
-    const response = await api.get("/coins", { params })
-    // Adapt backend response to frontend interface
-    const { data, meta } = response.data
-    return {
-      items: data,
-      total: meta.total_items,
-      page: meta.page,
-      page_size: meta.page_size,
-      total_pages: meta.total_pages,
-    }
+  }) => {
+    const response = await api.get<PaginatedResponse<Coin>>("/coins", {
+      params,
+    })
+    return response.data
   },
 
   get: async (id: number): Promise<Coin> => {
@@ -203,6 +218,33 @@ export const coinsApi = {
 export const dashboardApi = {
   getSummary: async (): Promise<DashboardSummary> => {
     const response = await api.get("/dashboard/summary")
+    return response.data
+  },
+}
+
+// Admin API
+export const adminApi = {
+  listAuditLogs: async (params?: {
+    page?: number
+    page_size?: number
+    action?: string
+    coin_id?: number
+    actor_email?: string
+    date_from?: string
+    date_to?: string
+  }) => {
+    const response = await api.get<PaginatedResponse<CoinAuditLog>>(
+      "/admin/audit-logs",
+      { params }
+    )
+    return response.data
+  },
+
+  adjustCoinQuantity: async (
+    coinId: number,
+    data: CoinAdjust
+  ): Promise<Coin> => {
+    const response = await api.post(`/admin/coins/${coinId}/adjust`, data)
     return response.data
   },
 }
