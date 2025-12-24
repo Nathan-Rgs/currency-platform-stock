@@ -1,6 +1,5 @@
-import { Link } from 'react-router-dom';
-import { Coins, Lock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Coins } from "lucide-react"
+import { Link } from "react-router-dom"
 
 export function PublicHeader() {
   return (
@@ -14,16 +13,16 @@ export function PublicHeader() {
             Numis<span className="text-gold">Gallery</span>
           </span>
         </Link>
-        
-        <nav className="flex items-center gap-4">
+
+        {/* <nav className="flex items-center gap-4">
           <Link to="/admin/login">
             <Button variant="ghost" size="sm" className="gap-2">
               <Lock className="h-4 w-4" />
               Admin
             </Button>
           </Link>
-        </nav>
+        </nav> */}
       </div>
     </header>
-  );
+  )
 }

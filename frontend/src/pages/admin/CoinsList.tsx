@@ -84,31 +84,11 @@ export default function CoinsList() {
         totalPages: response.meta.total_pages,
       })
     } catch (err) {
-      // Demo data alinhado ao seu payload do banco
-      setCoins([
-        {
-          id: 1,
-          quantity: 1,
-          owner_id: 3,
-          year: 1994,
-          country: "Brasil",
-          face_value: "1 Real",
-          purchase_price: 10.5,
-          estimated_value: 25.0,
-          originality: "original",
-          condition: "Flor de Cunho",
-          storage_location: "Álbum 1, p. 3",
-          category: "Comemorativa",
-          acquisition_date: "2025-12-18T21:47:31.211000",
-          acquisition_source: "Herança",
-          notes: "Moeda rara do plano Real.",
-          image_url_front: "",
-          image_url_back: "",
-          created_at: "",
-          updated_at: "",
-        } as any,
-      ])
-      setPagination({ page: 1, totalPages: 1 })
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as moedas.",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
@@ -200,6 +180,7 @@ export default function CoinsList() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Título</TableHead>
                 <TableHead>País</TableHead>
                 <TableHead>Ano</TableHead>
                 <TableHead>Valor de Face</TableHead>
@@ -215,6 +196,7 @@ export default function CoinsList() {
             <TableBody>
               {coins.map((coin: any) => (
                 <TableRow key={coin.id}>
+                  <TableCell className="font-medium">{coin.title}</TableCell>
                   <TableCell className="font-medium">{coin.country}</TableCell>
                   <TableCell>{coin.year}</TableCell>
 

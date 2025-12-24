@@ -7,6 +7,7 @@ class BaseModelWithOrm(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
 class CoinBase(BaseModel):
+    title: str = Field(..., max_length=100, example="Moeda de 1 Real de 1994")
     quantity: int = Field(1, ge=1, description="Quantidade de moedas iguais.")
     year: int = Field(..., gt=0, example=1994, description="Ano de cunhagem da moeda.")
     country: str = Field(..., max_length=100, example="Brasil")
@@ -24,9 +25,11 @@ class CoinBase(BaseModel):
     image_url_back: Optional[str] = Field(None, max_length=500)
 
 class CoinCreate(CoinBase):
+    title: str = Field(..., max_length=100, example="Moeda de 1 Real de 1994")
     pass
 
 class CoinUpdate(BaseModel):
+    title: Optional[str] = Field(None, max_length=100)
     quantity: Optional[int] = Field(None, ge=1)
     year: Optional[int] = Field(None, gt=0)
     country: Optional[str] = Field(None, max_length=100)

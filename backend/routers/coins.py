@@ -92,7 +92,7 @@ def list_coins(
     if search:
         like = f"%{search}%"
         base_query = base_query.where(
-            or_(Coin.country.ilike(like), Coin.face_value.ilike(like), Coin.notes.ilike(like))
+            or_(Coin.title.ilike(like), Coin.country.ilike(like), Coin.face_value.ilike(like), Coin.notes.ilike(like))
         )
 
     count_query = select(func.count()).select_from(base_query.subquery())

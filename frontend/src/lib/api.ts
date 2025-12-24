@@ -19,6 +19,7 @@ api.interceptors.request.use((config) => {
 // Types
 export interface Coin {
   id: number
+  title: string
   quantity: number
   year: number
   country: string
@@ -40,6 +41,7 @@ export interface Coin {
 }
 
 export interface CoinCreate {
+  title: string
   quantity?: number
   year: number
   country: string
@@ -54,7 +56,6 @@ export interface CoinCreate {
   acquisition_source?: string
   notes?: string
 }
-
 export interface PaginatedResponse<T> {
   data: T[]
   meta: {
@@ -96,26 +97,26 @@ export interface DashboardSummary {
 }
 
 export interface Token {
-  access_token: string;
-  token_type: string;
+  access_token: string
+  token_type: string
 }
 
 export interface LoginResponse {
-  token?: Token;
-  mfa_required?: boolean;
+  token?: Token
+  mfa_required?: boolean
 }
 
 export interface MfaSetupResponse {
-  provisioning_uri: string;
+  provisioning_uri: string
 }
 
 export interface User {
-  id: number;
-  email: string;
-  display_name: string | null;
-  is_mfa_enabled: boolean;
-  created_at: string;
-  updated_at: string;
+  id: number
+  email: string
+  display_name: string | null
+  is_mfa_enabled: boolean
+  created_at: string
+  updated_at: string
 }
 
 // Auth API
@@ -132,12 +133,20 @@ export const authApi = {
   },
 
   getMe: async (): Promise<User> => {
-    const response = await api.get("/auth/users/me");
-    return response.data;
+    const response = await api.get("/auth/users/me")
+    return response.data
   },
 
-  loginMfa: async (email: string, password: string, totp_code: string): Promise<Token> => {
-    const response = await api.post("/auth/login/mfa", { email, password, totp_code })
+  loginMfa: async (
+    email: string,
+    password: string,
+    totp_code: string
+  ): Promise<Token> => {
+    const response = await api.post("/auth/login/mfa", {
+      email,
+      password,
+      totp_code,
+    })
     return response.data
   },
 
@@ -147,19 +156,19 @@ export const authApi = {
   },
 
   setupMfa: async (): Promise<MfaSetupResponse> => {
-    const response = await api.post("/auth/mfa/setup");
-    return response.data;
+    const response = await api.post("/auth/mfa/setup")
+    return response.data
   },
 
   verifyMfa: async (totp_code: string): Promise<{ detail: string }> => {
-    const response = await api.post("/auth/mfa/verify", { totp_code });
-    return response.data;
+    const response = await api.post("/auth/mfa/verify", { totp_code })
+    return response.data
   },
 
   disableMfa: async (totp_code: string): Promise<{ detail: string }> => {
-    const response = await api.post("/auth/mfa/disable", { totp_code });
-    return response.data;
-  }
+    const response = await api.post("/auth/mfa/disable", { totp_code })
+    return response.data
+  },
 }
 
 // Coins API

@@ -76,10 +76,10 @@ export function CoinCard({ coin }: CoinCardProps) {
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               <h3 className="truncate font-display text-lg font-semibold text-foreground">
-                {coin.country}
+                {coin.title}
               </h3>
               <p className="text-sm text-muted-foreground">
-                {coin.year} • {(coin as any).face_value ?? "—"}
+                {coin.country} • {coin.year} • {(coin as any).face_value ?? "—"}
               </p>
             </div>
           </div>

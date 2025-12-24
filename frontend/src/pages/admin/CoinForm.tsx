@@ -83,6 +83,7 @@ export default function CoinForm() {
       notes?: string
     }
   >({
+    title: "",
     quantity: 1,
     country: "",
     year: new Date().getFullYear(),
@@ -112,6 +113,7 @@ export default function CoinForm() {
       .then((coin: Coin & any) => {
         setForm((prev) => ({
           ...prev,
+          title: coin.title ?? "",
           quantity: coin.quantity ?? 1,
           country: coin.country ?? "",
           year: Number(coin.year ?? new Date().getFullYear()),
@@ -167,10 +169,10 @@ export default function CoinForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!form.country || !form.face_value || !form.year) {
+    if (!form.title || !form.country || !form.face_value || !form.year) {
       toast({
         title: "Erro",
-        description: "Por favor, preencha País, Ano e Valor de Face.",
+        description: "Por favor, preencha Título, País, Ano e Valor de Face.",
         variant: "destructive",
       })
       return
@@ -334,6 +336,16 @@ export default function CoinForm() {
           </h2>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="title">Título *</Label>
+              <Input
+                id="title"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="Ex: Moeda de 1 Real de 1994"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="country">País *</Label>
               <Input

@@ -33,12 +33,10 @@ LOCKOUT_DURATION_MINUTES = 15
 
 
 def _normalize_totp_code(code: str) -> str:
-    # Usuário pode digitar "123 456", colar com newline, etc.
     return code.strip().replace(" ", "")
 
 
 def _normalize_secret(secret: str | bytes | bytearray) -> str:
-    # decrypt_data pode retornar bytes dependendo da implementação
     if isinstance(secret, (bytes, bytearray)):
         secret = secret.decode("utf-8", errors="ignore")
     return str(secret).strip().replace(" ", "")
@@ -119,12 +117,14 @@ def login(
             detail="Incorrect username or password",
         )
 
-    # Password verificado com sucesso: sempre resetar tentativas e lockout
     _reset_lockout(db, user)
+    jwt_token = create_access_token(user_id=user.id)
 
-    # Se MFA estiver habilitado, não devolve token aqui
-    if user.is_mfa_enabled:
-        return LoginResponse(mfa_required=True)
+    return LoginResponse(
+        token=Token(access_token=jwt_token),
+        mfa_required=bool(user.is_mfa_enabled),
+    )
+
 
 
 @router.post("/login/mfa", response_model=Token)
@@ -132,25 +132,17 @@ def login_mfa(
     mfa_login_data: MFALoginRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    Correções:
-    1) Aplica lockout check ANTES de processar MFA, impedindo bypass via /login/mfa.
-    2) Implementa tracking/lockout também para falhas de TOTP (brute-force).
-    """
     query = select(User).where(User.email == mfa_login_data.email)
     user = db.execute(query).scalars().first()
 
-    # Mantém resposta genérica para não vazar existência de conta
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
         )
 
-    # 1) Bloqueio deve ser verificado antes de qualquer processamento de senha/MFA
     _raise_if_locked(user)
 
-    # Senha errada também deve contar falha aqui (antes não contava)
     if not verify_password(mfa_login_data.password, user.hashed_password):
         _register_failed_attempt(db, user)
         raise HTTPException(
@@ -167,7 +159,6 @@ def login_mfa(
     totp = _totp_from_encrypted_secret(user.mfa_secret)
     code = _normalize_totp_code(mfa_login_data.totp_code)
 
-    # 2) TOTP inválido conta tentativa e pode travar a conta
     if not totp.verify(code, valid_window=1):
         _register_failed_attempt(db, user)
         raise HTTPException(
@@ -175,7 +166,6 @@ def login_mfa(
             detail="Invalid TOTP code.",
         )
 
-    # Sucesso total (senha + MFA): reset de tentativas/lockout
     _reset_lockout(db, user)
 
     access_token = create_access_token(user_id=user.id)
@@ -196,10 +186,6 @@ def setup_mfa(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Gera (ou reutiliza) o secret e devolve o provisioning URI.
-    Importante: reutilizar evita quebrar o app caso setup seja chamado mais de uma vez.
-    """
     if current_user.is_mfa_enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -207,11 +193,9 @@ def setup_mfa(
         )
 
     if current_user.mfa_secret:
-        # Reutiliza o secret já salvo
         decrypted = decrypt_data(current_user.mfa_secret)
         mfa_secret = _normalize_secret(decrypted)
     else:
-        # Gera uma única vez e persiste
         mfa_secret = pyotp.random_base32()
         current_user.mfa_secret = encrypt_data(mfa_secret)
         db.commit()
@@ -230,7 +214,6 @@ def verify_mfa(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Verifica o TOTP e habilita o MFA."""
     if current_user.is_mfa_enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -263,7 +246,6 @@ def disable_mfa(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Desabilita MFA após validar um último TOTP."""
     if not current_user.is_mfa_enabled or not current_user.mfa_secret:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
