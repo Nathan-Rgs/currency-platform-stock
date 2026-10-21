@@ -16,6 +16,16 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("access_token")
+    }
+    return Promise.reject(error)
+  },
+)
+
 // Types
 export interface Coin {
   id: number
@@ -140,7 +150,7 @@ export const authApi = {
   loginMfa: async (
     email: string,
     password: string,
-    totp_code: string
+    totp_code: string,
   ): Promise<Token> => {
     const response = await api.post("/auth/login/mfa", {
       email,
@@ -210,7 +220,7 @@ export const coinsApi = {
   uploadImages: async (
     id: number,
     frontImage?: File,
-    backImage?: File
+    backImage?: File,
   ): Promise<Coin> => {
     const formData = new FormData()
     if (frontImage) formData.append("front_image", frontImage)
@@ -244,14 +254,14 @@ export const adminApi = {
   }) => {
     const response = await api.get<PaginatedResponse<CoinAuditLog>>(
       "/admin/audit-logs",
-      { params }
+      { params },
     )
     return response.data
   },
 
   adjustCoinQuantity: async (
     coinId: number,
-    data: CoinAdjust
+    data: CoinAdjust,
   ): Promise<Coin> => {
     const response = await api.post(`/admin/coins/${coinId}/adjust`, data)
     return response.data

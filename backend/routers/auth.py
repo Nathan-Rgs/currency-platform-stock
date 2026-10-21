@@ -156,14 +156,25 @@ def login_mfa(
             detail="MFA is not enabled for this account.",
         )
 
-    totp = _totp_from_encrypted_secret(user.mfa_secret)
-    code = _normalize_totp_code(mfa_login_data.totp_code)
+    try:
+        decrypted_secret = decrypt_data(user.mfa_secret)
+        normalized_secret = _normalize_secret(decrypted_secret)
+        totp = pyotp.TOTP(normalized_secret)
+        code = _normalize_totp_code(mfa_login_data.totp_code)
 
-    if not totp.verify(code, valid_window=1):
-        _register_failed_attempt(db, user)
+        is_valid = totp.verify(code, valid_window=10)
+
+        if not is_valid:
+            _register_failed_attempt(db, user)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid TOTP code.",
+            )
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid TOTP code.",
+            detail="Authentication failed during MFA verification.",
         )
 
     _reset_lockout(db, user)
@@ -191,14 +202,9 @@ def setup_mfa(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="MFA is already enabled.",
         )
-
-    if current_user.mfa_secret:
-        decrypted = decrypt_data(current_user.mfa_secret)
-        mfa_secret = _normalize_secret(decrypted)
-    else:
-        mfa_secret = pyotp.random_base32()
-        current_user.mfa_secret = encrypt_data(mfa_secret)
-        db.commit()
+    mfa_secret = pyotp.random_base32()
+    current_user.mfa_secret = encrypt_data(mfa_secret)
+    db.commit()
 
     totp = pyotp.TOTP(mfa_secret)
     provisioning_uri = totp.provisioning_uri(
@@ -226,13 +232,23 @@ def verify_mfa(
             detail="MFA secret not found. Please run setup first.",
         )
 
-    totp = _totp_from_encrypted_secret(current_user.mfa_secret)
-    code = _normalize_totp_code(mfa_in.totp_code)
+    try:
+        decrypted_secret = decrypt_data(current_user.mfa_secret)
+        normalized_secret = _normalize_secret(decrypted_secret)
+        totp = pyotp.TOTP(normalized_secret)
+        code = _normalize_totp_code(mfa_in.totp_code)
 
-    if not totp.verify(code, valid_window=1):
+        is_valid = totp.verify(code, valid_window=10)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid TOTP code.",
+            )
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid TOTP code.",
+            detail=f"Verification error: {str(e)}",
         )
 
     current_user.is_mfa_enabled = True

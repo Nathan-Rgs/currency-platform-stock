@@ -1,9 +1,15 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AdminSidebar } from './AdminSidebar';
+import { useEffect } from 'react';
 
 export function AdminLayout() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, checkAuth } = useAuth();
+  const location = useLocation();
+
+  useEffect(() => {
+    checkAuth();
+  }, [location.pathname, checkAuth]);
 
   if (isLoading) {
     return (

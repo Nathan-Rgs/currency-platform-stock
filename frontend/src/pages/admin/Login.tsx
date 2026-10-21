@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import { authApi } from "@/lib/api"
 import { Coins, Eye, EyeOff, Loader2 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 
 export default function AdminLogin() {
@@ -15,9 +15,15 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [isWaitingForMfa, setIsWaitingForMfa] = useState(false)
-  const { login, finishMfaLogin } = useAuth()
+  const { login, finishMfaLogin, isAuthenticated, isLoading } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      navigate("/admin/dashboard", { replace: true })
+    }
+  }, [isAuthenticated, isLoading, navigate])
 
   const handlePrimaryLogin = async (e: React.FormEvent) => {
     e.preventDefault()
