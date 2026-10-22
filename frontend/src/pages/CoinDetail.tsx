@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { publicApi } from "@/lib/api"
 import { BRAND_NAME } from "@/lib/brand"
-import { formatBRL, originalityLabel, resolveImageUrl } from "@/lib/coin-format"
+import { formatBRL, formatDecimal, originalityLabel, resolveImageUrl } from "@/lib/coin-format"
 import { buildContactLinks } from "@/lib/contact"
 import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
@@ -98,11 +98,13 @@ export default function CoinDetail() {
     ? buildContactLinks(coin, window.location.href)
     : { whatsapp: null, email: null }
 
+  const mm = formatDecimal(coin.diameter_mm)
+  const g = formatDecimal(coin.weight_g)
   const specs: [string, string | null | undefined][] = [
     ["Valor de face", coin.face_value],
     ["Material", coin.material],
-    ["Diâmetro", coin.diameter_mm != null ? `${coin.diameter_mm} mm` : null],
-    ["Peso", coin.weight_g != null ? `${coin.weight_g} g` : null],
+    ["Diâmetro", mm && `${mm} mm`],
+    ["Peso", g && `${g} g`],
     ["Casa da moeda", coin.mint_mark],
     ["Categoria", coin.category],
   ]

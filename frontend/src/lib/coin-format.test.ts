@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { formatBRL, originalityLabel, resolveImageUrl } from "./coin-format"
+import { formatBRL, formatDecimal, originalityLabel, resolveImageUrl } from "./coin-format"
 
 describe("coin-format", () => {
+  it("formatDecimal pt-BR", () => {
+    expect(formatDecimal(25.5)).toBe("25,5")
+    expect(formatDecimal("4.27")).toBe("4,27")
+    expect(formatDecimal(null)).toBeNull()
+  })
   it("formata BRL", () => expect(formatBRL(1234.5)).toBe("R$ 1.234,50"))
   it("nulo vira traço", () => expect(formatBRL(null)).toBe("—"))
   it("rótulo de originalidade", () => expect(originalityLabel("REPLICA")).toBe("Réplica"))

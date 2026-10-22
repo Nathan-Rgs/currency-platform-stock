@@ -48,3 +48,9 @@ export function resolveImageUrl(path: string | null | undefined): string | null 
   if (p.startsWith("http://") || p.startsWith("https://")) return p
   return `${String(API_URL).replace(/\/$/, "")}/${p.replace(/^\//, "")}`
 }
+
+export function formatDecimal(v: number | string | null | undefined): string | null {
+  if (v == null || v === "") return null
+  const n = Number(v)
+  return Number.isNaN(n) ? null : n.toLocaleString("pt-BR", { maximumFractionDigits: 2 })
+}
