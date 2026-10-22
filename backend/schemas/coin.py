@@ -1,7 +1,14 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from models.coin import OriginalityEnum
+
+def _check_year(v):
+    # bound evaluated at validation time, not import time
+    if v is not None and v > datetime.now().year + 1:
+        raise ValueError("year cannot be in the future")
+    return v
+
 
 class BaseModelWithOrm(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -23,6 +30,19 @@ class CoinBase(BaseModel):
     notes: Optional[str] = Field(None, example="Moeda rara do plano Real.")
     image_url_front: Optional[str] = Field(None, max_length=500)
     image_url_back: Optional[str] = Field(None, max_length=500)
+    for_sale: bool = False
+    sale_price: Optional[float] = Field(None, ge=0)
+    public_description: Optional[str] = None
+    catalog_ref: Optional[str] = Field(None, max_length=50)
+    material: Optional[str] = Field(None, max_length=100)
+    diameter_mm: Optional[float] = Field(None, ge=0)
+    weight_g: Optional[float] = Field(None, ge=0)
+    mint_mark: Optional[str] = Field(None, max_length=50)
+
+    @field_validator("year")
+    @classmethod
+    def _year_not_future(cls, v):
+        return _check_year(v)
 
 class CoinCreate(CoinBase):
     title: str = Field(..., max_length=100, example="Moeda de 1 Real de 1994")
@@ -45,6 +65,19 @@ class CoinUpdate(BaseModel):
     notes: Optional[str] = None
     image_url_front: Optional[str] = Field(None, max_length=500)
     image_url_back: Optional[str] = Field(None, max_length=500)
+    for_sale: Optional[bool] = None
+    sale_price: Optional[float] = Field(None, ge=0)
+    public_description: Optional[str] = None
+    catalog_ref: Optional[str] = Field(None, max_length=50)
+    material: Optional[str] = Field(None, max_length=100)
+    diameter_mm: Optional[float] = Field(None, ge=0)
+    weight_g: Optional[float] = Field(None, ge=0)
+    mint_mark: Optional[str] = Field(None, max_length=50)
+
+    @field_validator("year")
+    @classmethod
+    def _year_not_future(cls, v):
+        return _check_year(v)
 
 class CoinRead(BaseModelWithOrm, CoinBase):
     id: int

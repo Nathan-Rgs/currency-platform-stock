@@ -45,6 +45,14 @@ export interface Coin {
   notes?: string
   image_url_front?: string
   image_url_back?: string
+  for_sale?: boolean
+  sale_price?: number | null
+  public_description?: string | null
+  catalog_ref?: string | null
+  material?: string | null
+  diameter_mm?: number | null
+  weight_g?: number | null
+  mint_mark?: string | null
   owner_id: number
   created_at: string
   updated_at: string
@@ -65,6 +73,14 @@ export interface CoinCreate {
   acquisition_date?: string
   acquisition_source?: string
   notes?: string
+  for_sale?: boolean
+  sale_price?: number | null
+  public_description?: string | null
+  catalog_ref?: string | null
+  material?: string | null
+  diameter_mm?: number | null
+  weight_g?: number | null
+  mint_mark?: string | null
 }
 export interface PaginatedResponse<T> {
   data: T[]

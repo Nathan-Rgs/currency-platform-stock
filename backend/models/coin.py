@@ -9,6 +9,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -46,6 +47,16 @@ class Coin(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     image_url_front: Mapped[str | None] = mapped_column(String(500))
     image_url_back: Mapped[str | None] = mapped_column(String(500))
+    for_sale: Mapped[bool] = mapped_column(
+        default=False, server_default=false(), index=True
+    )
+    sale_price: Mapped[float | None] = mapped_column(Float)
+    public_description: Mapped[str | None] = mapped_column(Text)
+    catalog_ref: Mapped[str | None] = mapped_column(String(50), index=True)
+    material: Mapped[str | None] = mapped_column(String(100))
+    diameter_mm: Mapped[float | None] = mapped_column(Float)
+    weight_g: Mapped[float | None] = mapped_column(Float)
+    mint_mark: Mapped[str | None] = mapped_column(String(50))
 
     # Foreign Key
     owner_id: Mapped[int] = mapped_column(
