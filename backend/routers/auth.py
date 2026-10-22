@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from core.config import settings
 from core.database import get_db
 from core.security import (
     create_access_token,
@@ -74,6 +75,11 @@ def _reset_lockout(db: Session, user: User) -> None:
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserRead)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
+    if not settings.ALLOW_REGISTRATION:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is disabled.",
+        )
     query = select(User).where(User.email == user_in.email)
     existing_user = db.execute(query).scalars().first()
     if existing_user:

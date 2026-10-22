@@ -19,7 +19,7 @@ from sqlalchemy import func, select, or_
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from core.security import get_current_user
+from core.security import get_current_active_user
 from models.coin import Coin, OriginalityEnum
 from models.user import User
 from schemas.coin import CoinCreate, CoinRead, CoinUpdate
@@ -46,7 +46,7 @@ def get_coin_or_404(db: Session, coin_id: int, user_id: int) -> Coin:
 def create_coin(
     coin_in: CoinCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     audit_service: AuditService = Depends(get_audit_service),
 ):
     coin = Coin(**coin_in.model_dump(), owner_id=current_user.id)
@@ -68,7 +68,7 @@ def create_coin(
 @router.get("", response_model=PaginatedResponse[CoinRead])
 def list_coins(
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     country: Optional[str] = Query(None),
@@ -77,9 +77,7 @@ def list_coins(
     originality: Optional[OriginalityEnum] = Query(None),
     search: Optional[str] = Query(None, description="Search in country, value, and notes"),
 ):
-    base_query = select(Coin)
-    if current_user:
-        base_query = base_query.where(Coin.owner_id == current_user.id)
+    base_query = select(Coin).where(Coin.owner_id == current_user.id)
 
     if country:
         base_query = base_query.where(Coin.country.ilike(f"%{country}%"))
@@ -138,7 +136,7 @@ def update_coin(
     coin_id: int,
     coin_in: CoinCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     audit_service: AuditService = Depends(get_audit_service),
 ):
     coin = get_coin_or_404(db, coin_id, current_user.id)
@@ -169,7 +167,7 @@ def partial_update_coin(
     coin_id: int,
     coin_in: CoinUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     audit_service: AuditService = Depends(get_audit_service),
 ):
     coin = get_coin_or_404(db, coin_id, current_user.id)
@@ -203,7 +201,7 @@ def partial_update_coin(
 def delete_coin(
     coin_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     audit_service: AuditService = Depends(get_audit_service),
 ):
     coin = get_coin_or_404(db, coin_id, current_user.id)
@@ -227,7 +225,7 @@ def delete_coin(
 def upload_coin_image(
     coin_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     front_image: UploadFile | None = File(None),
     back_image: UploadFile | None = File(None),
 ):
@@ -259,7 +257,7 @@ def upload_coin_image(
 def import_from_file(
     file: UploadFile,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     audit_service: AuditService = Depends(get_audit_service),
 ):
     content = file.file.read()
@@ -319,7 +317,7 @@ def import_from_file(
 def export_to_file(
     format: str = Query("json", enum=["json", "csv"]),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     query = select(Coin).where(Coin.owner_id == current_user.id)
     coins = db.execute(query).scalars().all()
