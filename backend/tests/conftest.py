@@ -3,7 +3,7 @@ import os
 from cryptography.fernet import Fernet
 
 os.environ["DATABASE_URL"] = "sqlite://"
-os.environ["JWT_SECRET_KEY"] = "test"
+os.environ["JWT_SECRET_KEY"] = "test-secret-key-0123456789-abcdefghijklmnop"
 os.environ["MFA_SECRET_KEY"] = Fernet.generate_key().decode()
 
 import pytest

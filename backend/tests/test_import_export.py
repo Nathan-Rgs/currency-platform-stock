@@ -48,11 +48,12 @@ def test_import_undecodable_400(client, auth_headers):
 
 
 def test_export_roundtrip(client, auth_headers, make_coin):
-    make_coin(title="Réis", catalog_ref="KM# 1", for_sale=True, sale_price=12.5)
+    make_coin(title="Réis", catalog_ref="KM# 1", for_sale=True, sale_price=12.5, purchase_price=10.5)
     r = client.get("/api/v1/coins/export/all", params={"format": "csv"}, headers=auth_headers)
     assert r.content.startswith(b"\xef\xbb\xbf")
     assert "colecao-" in r.headers["content-disposition"]
     assert ";" in r.content.decode("utf-8-sig").splitlines()[0]
+    assert ";10,5;" in r.content.decode("utf-8-sig")
     out = _post(client, auth_headers, "e.csv", r.content).json()
     assert out == {"inserted": 1, "errors": []}
 

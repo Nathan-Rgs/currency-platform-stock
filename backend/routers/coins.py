@@ -292,7 +292,10 @@ def _csv_response(columns, rows, filename: str) -> Response:
     out = io.StringIO()
     writer = csv.DictWriter(out, fieldnames=columns, delimiter=";", extrasaction="ignore")
     writer.writeheader()
-    writer.writerows(rows)
+    # pt-BR Excel reads "10,5" as a number, "10.5" as text.
+    writer.writerows(
+        {k: (str(v).replace(".", ",") if isinstance(v, float) else v) for k, v in r.items()} for r in rows
+    )
     return Response(
         out.getvalue().encode("utf-8-sig"),
         media_type="text/csv; charset=utf-8",
