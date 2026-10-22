@@ -30,31 +30,8 @@ import {
   Trash2,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
+import { formatBRL, originalityBadgeClasses, originalityLabel } from "@/lib/coin-format"
 import { Link } from "react-router-dom"
-
-type Originality = "original" | "replica" | "unknown" | string
-
-function formatCurrencyBRL(value: number) {
-  return `R$ ${Number(value ?? 0).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
-
-function originalityLabel(value: Originality) {
-  const v = String(value ?? "").toLowerCase()
-  if (v === "original") return "Original"
-  if (v === "replica") return "Réplica"
-  if (v === "unknown") return "Desconhecida"
-  return value || "—"
-}
-
-function originalityBadgeClasses(value: Originality) {
-  const v = String(value ?? "").toLowerCase()
-  if (v === "original") return "bg-emerald-500/10 text-emerald-700"
-  if (v === "replica") return "bg-orange-500/10 text-orange-700"
-  return "bg-muted text-muted-foreground"
-}
 
 function truncate(text: string, max = 60) {
   const t = String(text ?? "").trim()
@@ -217,7 +194,7 @@ export default function CoinsList() {
                   </TableCell>
 
                   <TableCell className="font-display font-semibold text-gold">
-                    {formatCurrencyBRL(Number(coin.estimated_value ?? 0))}
+                    {formatBRL(Number(coin.estimated_value ?? 0))}
                   </TableCell>
 
                   {/* NOVO: coluna notes (truncada + tooltip) */}

@@ -3,23 +3,11 @@ import { CoinFilters } from "@/components/coins/CoinFilters"
 import { PublicHeader } from "@/components/layout/PublicHeader"
 import { Button } from "@/components/ui/button"
 import { Coin, coinsApi, PaginatedResponse } from "@/lib/api"
+import { normalizeOriginality } from "@/lib/coin-format"
 import { ChevronLeft, ChevronRight, Coins, Loader2 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 
-/**
- * Alinhado com o payload do seu banco:
- * originality: "original" | "replica" | "unknown"
- * face_value: string (ex: "1 Real")
- * image_url_front/back: string | null
- */
 type Originality = "original" | "replica" | "unknown" | "all" | ""
-
-function normalizeOriginality(value: any): "original" | "replica" | "unknown" {
-  const v = String(value ?? "").toLowerCase()
-  if (v === "original") return "original"
-  if (v === "replica") return "replica"
-  return "unknown"
-}
 
 const Index = () => {
   const [coins, setCoins] = useState<Coin[]>([])
@@ -39,54 +27,6 @@ const Index = () => {
   const [yearTo, setYearTo] = useState<string>("")
   const [originality, setOriginality] = useState<Originality>("")
   const [countries, setCountries] = useState<string[]>([])
-
-  // Demo data 100% compatível com o payload que você mostrou
-  const demoCoins = useMemo(
-    () =>
-      [
-        {
-          id: 4,
-          owner_id: 3,
-          year: 1994,
-          country: "Brasil",
-          face_value: "1 Real",
-          purchase_price: 10.5,
-          estimated_value: 25.0,
-          originality: "original",
-          condition: "Flor de Cunho",
-          storage_location: "Álbum 1, p. 3",
-          category: "Comemorativa",
-          acquisition_date: "2025-12-18T21:47:31.211000",
-          acquisition_source: "Herança",
-          notes: "Moeda rara do plano Real.",
-          image_url_front: "",
-          image_url_back: "",
-          created_at: "2025-12-18T21:47:21.454233Z",
-          updated_at: "2025-12-18T21:47:21.454233Z",
-        },
-        {
-          id: 5,
-          owner_id: 3,
-          year: 1889,
-          country: "Portugal",
-          face_value: "20 Réis",
-          purchase_price: null,
-          estimated_value: 120.0,
-          originality: "unknown",
-          condition: "Boa",
-          storage_location: "Caixa 2",
-          category: "Histórica",
-          acquisition_date: null,
-          acquisition_source: "Colecionador",
-          notes: "Peça antiga com marcas do tempo.",
-          image_url_front: "",
-          image_url_back: "",
-          created_at: "2025-12-10T10:00:00.000Z",
-          updated_at: "2025-12-10T10:00:00.000Z",
-        },
-      ] as any as Coin[],
-    []
-  )
 
   const mergeCountries = (items: any[]) => {
     const list = (items ?? [])
@@ -125,6 +65,7 @@ const Index = () => {
       setPagination({
         page: response.meta?.page ?? page,
         totalPages: response.meta?.total_pages ?? 1,
+        total: response.meta?.total_items ?? 0,
       })
 
       mergeCountries(response.data ?? [])
@@ -133,9 +74,8 @@ const Index = () => {
         "Não foi possível carregar as moedas. Verifique se o servidor está funcionando."
       )
 
-      setCoins(demoCoins)
-      setPagination({ page: 1, totalPages: 1, total: demoCoins.length })
-      mergeCountries(demoCoins as any)
+      setCoins([])
+      setPagination({ page: 1, totalPages: 1, total: 0 })
     } finally {
       setLoading(false)
     }
@@ -201,7 +141,7 @@ const Index = () => {
           yearTo={yearTo}
           onYearToChange={setYearTo}
           originality={originality}
-          onOriginalityChange={setOriginality}
+          onOriginalityChange={(v) => setOriginality(v as Originality)}
           onClear={clearFilters}
           countries={countries}
         />
@@ -222,7 +162,6 @@ const Index = () => {
         {error && !loading && (
           <div className="mt-8 rounded-lg border border-gold/20 bg-gold/5 p-4 text-center text-muted-foreground">
             <p>{error}</p>
-            <p className="mt-2 text-sm">Exibindo dados de demonstração</p>
           </div>
         )}
 
@@ -242,7 +181,7 @@ const Index = () => {
           </div>
         )}
 
-        {!loading && coins.length === 0 && (
+        {!loading && !error && coins.length === 0 && (
           <div className="py-20 text-center">
             <Coins className="mx-auto h-16 w-16 text-muted-foreground/30" />
             <h3 className="mt-4 font-display text-xl font-semibold">

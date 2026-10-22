@@ -1,7 +1,8 @@
 import { PublicHeader } from "@/components/layout/PublicHeader"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { API_URL, Coin, coinsApi } from "@/lib/api"
+import { Coin, coinsApi } from "@/lib/api"
+import { formatBRL, originalityBadgeClasses, originalityLabel, resolveImageUrl } from "@/lib/coin-format"
 import {
   Archive,
   ArrowLeft,
@@ -19,43 +20,11 @@ import {
 import { useEffect, useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 
-type Originality = "original" | "replica" | "unknown" | string
-
-function originalityLabel(value: Originality) {
-  const v = String(value ?? "").toLowerCase()
-  if (v === "original") return "Original"
-  if (v === "replica") return "Réplica"
-  if (v === "unknown") return "Desconhecida"
-  return value || "—"
-}
-
-function originalityBadgeClasses(value: Originality) {
-  const v = String(value ?? "").toLowerCase()
-  if (v === "original") return "bg-emerald-500/10 text-emerald-700 border-0"
-  if (v === "replica") return "bg-orange-500/10 text-orange-700 border-0"
-  return "bg-muted text-muted-foreground border-0"
-}
-
-function formatCurrencyBRL(value: number) {
-  return `R$ ${Number(value ?? 0).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
-
 function formatDateTime(iso?: string | null) {
   if (!iso) return "—"
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return "—"
   return d.toLocaleString("pt-BR")
-}
-
-function safeImageUrl(path?: string | null) {
-  if (!path) return null
-  const p = String(path).trim()
-  if (!p || p === "string") return null
-  if (p.startsWith("http://") || p.startsWith("https://")) return p
-  return `${API_URL.replace(/\/$/, "")}/${p.replace(/^\//, "")}`
 }
 
 export default function CoinDetail() {
@@ -93,8 +62,8 @@ export default function CoinDetail() {
             const images = useMemo(() => {
               const c: any = coin
               return {
-                front: safeImageUrl(c?.image_url_front),
-                back: safeImageUrl(c?.image_url_back),
+                front: resolveImageUrl(c?.image_url_front),
+                back: resolveImageUrl(c?.image_url_back),
               }
             }, [coin])
           
@@ -229,7 +198,7 @@ export default function CoinDetail() {
                       <div>
                         <div className="mb-4 flex flex-wrap items-center gap-3">
                           <Badge
-                            className={`text-sm ${originalityBadgeClasses(
+                            className={`border-0 text-sm ${originalityBadgeClasses(
                               c.originality
                             )}`}
                           >
@@ -324,7 +293,7 @@ export default function CoinDetail() {
                                 Valor estimado
                               </p>
                               <p className="font-display text-2xl font-bold text-gold">
-                                {formatCurrencyBRL(Number(c.estimated_value ?? 0))}
+                                {formatBRL(Number(c.estimated_value ?? 0))}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 (Estimativa informativa; preço de venda pode variar)

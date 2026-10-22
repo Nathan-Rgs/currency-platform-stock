@@ -10,18 +10,11 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { API_URL, Coin, CoinCreate, coinsApi } from "@/lib/api"
+import { Coin, CoinCreate, coinsApi } from "@/lib/api"
+import { normalizeOriginality, ORIGINALITY_OPTIONS, resolveImageUrl } from "@/lib/coin-format"
 import { ArrowLeft, ImageIcon, Loader2, Save } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-
-const originalityOptions = [
-  { value: "original", label: "Original" },
-  { value: "replica", label: "Réplica" },
-  { value: "unknown", label: "Desconhecida" },
-] as const
-
-type OriginalityValue = (typeof originalityOptions)[number]["value"]
 
 function toInputDateTimeLocal(iso?: string | null) {
   if (!iso) return ""
@@ -41,21 +34,6 @@ function fromInputDateTimeLocal(value: string) {
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return null
   return d.toISOString()
-}
-
-function normalizeOriginality(value: any): OriginalityValue {
-  const v = String(value ?? "").toLowerCase()
-  if (v === "original") return "original"
-  if (v === "replica") return "replica"
-  return "unknown"
-}
-
-function resolveImageUrl(url?: string | null) {
-  if (!url) return null
-  const u = String(url).trim()
-  if (!u || u === "string") return null
-  if (u.startsWith("http://") || u.startsWith("https://")) return u
-  return `${String(API_URL).replace(/\/$/, "")}/${u.replace(/^\//, "")}`
 }
 
 export default function CoinForm() {
@@ -502,7 +480,7 @@ export default function CoinForm() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {originalityOptions.map((opt) => (
+                  {ORIGINALITY_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>

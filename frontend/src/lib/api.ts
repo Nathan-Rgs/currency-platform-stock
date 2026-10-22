@@ -1,6 +1,7 @@
 import axios from "axios"
 
-export const API_URL = "http://localhost:8000"
+export const API_URL: string =
+  import.meta.env.VITE_API_URL ?? "http://localhost:8000"
 const API_BASE_URL = `${API_URL}/api/v1`
 
 export const api = axios.create({
@@ -27,6 +28,53 @@ api.interceptors.response.use(
 )
 
 // Types
+export interface CoinPublic {
+  id: number
+  title: string
+  quantity: number
+  year: number
+  country: string
+  face_value: string
+  originality: string
+  condition?: string | null
+  category?: string | null
+  catalog_ref?: string | null
+  material?: string | null
+  diameter_mm?: number | null
+  weight_g?: number | null
+  mint_mark?: string | null
+  for_sale: boolean
+  sale_price?: number | null
+  public_description?: string | null
+  image_url_front?: string | null
+  image_url_back?: string | null
+}
+
+export interface CoinFacets {
+  countries: string[]
+  categories: string[]
+  year_min: number | null
+  year_max: number | null
+}
+
+export interface CoinListParams {
+  page?: number
+  page_size?: number
+  search?: string
+  country?: string
+  category?: string
+  year_from?: number
+  year_to?: number
+  originality?: "original" | "replica" | "unknown"
+  for_sale?: boolean
+  sort?: "created_desc" | "year_desc" | "year_asc" | "title_asc"
+}
+
+export interface ImportResult {
+  inserted: number
+  errors: { row: number; message: string }[]
+}
+
 export interface Coin {
   id: number
   title: string
@@ -202,17 +250,30 @@ export const authApi = {
   },
 }
 
+// Public API (sem autenticação)
+export const publicApi = {
+  list: async (params?: CoinListParams) => {
+    const response = await api.get<PaginatedResponse<CoinPublic>>(
+      "/public/coins",
+      { params },
+    )
+    return response.data
+  },
+
+  get: async (id: number): Promise<CoinPublic> => {
+    const response = await api.get(`/public/coins/${id}`)
+    return response.data
+  },
+
+  facets: async (): Promise<CoinFacets> => {
+    const response = await api.get("/public/facets")
+    return response.data
+  },
+}
+
 // Coins API
 export const coinsApi = {
-  list: async (params?: {
-    page?: number
-    page_size?: number
-    country?: string
-    year_from?: number
-    year_to?: number
-    originality?: string
-    search?: string
-  }) => {
+  list: async (params?: CoinListParams) => {
     const response = await api.get<PaginatedResponse<Coin>>("/coins", {
       params,
     })
@@ -236,6 +297,28 @@ export const coinsApi = {
 
   delete: async (id: number): Promise<void> => {
     await api.delete(`/coins/${id}`)
+  },
+
+  importFile: async (file: File): Promise<ImportResult> => {
+    const formData = new FormData()
+    formData.append("file", file)
+    const response = await api.post<ImportResult>("/coins/import", formData)
+    return response.data
+  },
+
+  exportFile: async (format: "csv" | "json"): Promise<Blob> => {
+    const response = await api.get("/coins/export/all", {
+      params: { format },
+      responseType: "blob",
+    })
+    return response.data
+  },
+
+  template: async (): Promise<Blob> => {
+    const response = await api.get("/coins/import/template", {
+      responseType: "blob",
+    })
+    return response.data
   },
 
   uploadImages: async (

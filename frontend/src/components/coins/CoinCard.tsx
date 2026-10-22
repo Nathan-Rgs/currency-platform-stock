@@ -1,36 +1,12 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { API_URL, Coin } from "@/lib/api"
+import { Coin } from "@/lib/api"
+import { formatBRL, originalityLabel, resolveImageUrl } from "@/lib/coin-format"
 import { ImageIcon } from "lucide-react"
 import { Link } from "react-router-dom"
 
 interface CoinCardProps {
   coin: Coin
-}
-
-type Originality = "original" | "replica" | "unknown" | string
-
-function resolveImageUrl(url?: string | null) {
-  if (!url) return null
-  const u = String(url).trim()
-  if (!u || u === "string") return null
-  if (u.startsWith("http://") || u.startsWith("https://")) return u
-  return `${String(API_URL).replace(/\/$/, "")}/${u.replace(/^\//, "")}`
-}
-
-function originalityLabel(value: Originality) {
-  const v = String(value ?? "").toLowerCase()
-  if (v === "original") return "Original"
-  if (v === "replica") return "Réplica"
-  if (v === "unknown") return "Desconhecida"
-  return value || "—"
-}
-
-function formatCurrencyBRL(value?: number | null) {
-  return `R$ ${Number(value ?? 0).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
 }
 
 export function CoinCard({ coin }: CoinCardProps) {
@@ -89,7 +65,7 @@ export function CoinCard({ coin }: CoinCardProps) {
               Valor estimado
             </span>
             <span className="font-display text-lg font-semibold text-gold">
-              {formatCurrencyBRL((coin as any).estimated_value)}
+              {formatBRL((coin as any).estimated_value)}
             </span>
           </div>
         </CardContent>
