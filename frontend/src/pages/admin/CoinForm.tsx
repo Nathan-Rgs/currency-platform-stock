@@ -31,7 +31,7 @@ import axios from "axios"
 import { Camera, Loader2, Lock, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { useForm, useFormContext } from "react-hook-form"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 // ponytail: local API error formatter; Task 17 replaces it with the shared apiErrorMessage helper.
 function apiErrorDetail(e: unknown): string {
@@ -210,6 +210,8 @@ export default function CoinForm() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const isEditing = !!id
+  const fromId = useSearchParams()[0].get("from")
+  const [duplicatingTitle, setDuplicatingTitle] = useState<string | null>(null)
 
   const form = useForm<CoinFormValues, unknown, CoinFormParsed>({
     resolver: zodResolver(coinFormSchema),
@@ -252,6 +254,26 @@ export default function CoinForm() {
         navigate("/admin/coins")
       })
   }, [id, form, navigate, toast])
+
+  // Duplicar: copia os campos da moeda de origem, sem fotos.
+  useEffect(() => {
+    if (id || !fromId) return
+    coinsApi
+      .get(Number(fromId))
+      .then((coin: Coin) => {
+        const values = coinToFormValues(coin)
+        form.reset(values)
+        setOtherCondition(!!values.condition && !CONDITION_OPTIONS.includes(values.condition))
+        setDuplicatingTitle(coin.title)
+      })
+      .catch((e) =>
+        toast({
+          title: "Não foi possível carregar a moeda de origem.",
+          description: apiErrorDetail(e),
+          variant: "destructive",
+        }),
+      )
+  }, [id, fromId, form, toast])
 
   const pick = (set: typeof setFront) => (file: File) =>
     set((p) => {
@@ -349,6 +371,10 @@ export default function CoinForm() {
           <X className="h-5 w-5" aria-hidden="true" />
         </button>
       </header>
+
+      {duplicatingTitle && (
+        <p className="mb-3 text-sm text-muted-foreground">Duplicando: {duplicatingTitle}</p>
+      )}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit((v) => save(v, false))} noValidate className="space-y-3.5">
