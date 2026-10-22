@@ -38,8 +38,7 @@ const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" 
 
 export function formatBRL(v: number | null | undefined): string {
   if (v == null) return "—"
-  // Intl usa espaço não separável após "R$"
-  return brl.format(Number(v)).replace(/ /g, " ")
+  return brl.format(Number(v))
 }
 
 export function resolveImageUrl(path: string | null | undefined): string | null {
