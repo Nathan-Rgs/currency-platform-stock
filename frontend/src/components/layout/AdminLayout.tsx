@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { AdminSidebar } from './AdminSidebar';
+import { AdminMobileBar, AdminSidebar } from './AdminSidebar';
 import { useEffect } from 'react';
 
 export function AdminLayout() {
@@ -26,7 +26,8 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
-      <main className="ml-64 min-h-screen p-8">
+      <AdminMobileBar />
+      <main className="min-h-screen p-4 lg:ml-64 lg:p-8">
         <Outlet />
       </main>
     </div>
