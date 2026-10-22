@@ -1,607 +1,180 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { dashboardApi, DashboardSummary } from "@/lib/api"
-import {
-  Calendar,
-  Coins,
-  Copy,
-  DollarSign,
-  Globe,
-  Loader2,
-  Percent,
-  TrendingUp,
-  Trophy,
-} from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+import { ImportDialog } from "@/components/coins/ImportDialog"
+import { Button } from "@/components/ui/button"
+import { ChartContainer } from "@/components/ui/chart"
+import { Skeleton } from "@/components/ui/skeleton"
+import { dashboardApi } from "@/lib/api"
+import { formatBRL, originalityLabel, resolveImageUrl } from "@/lib/coin-format"
+import { ChartRow, groupByDecade, topN } from "@/lib/dashboard-data"
+import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
+import { Link } from "react-router-dom"
+import { Bar, BarChart, Cell, LabelList, XAxis, YAxis } from "recharts"
 
-const COLORS = ["#d4a84b", "#b8923f", "#9c7c33", "#806627", "#64501b"]
+// Graphite, gold and graphite tints: lightness differs, not only hue.
+const PALETTE = [
+  "hsl(var(--primary))",
+  "hsl(var(--accent))",
+  "hsl(var(--primary) / 0.6)",
+  "hsl(var(--accent) / 0.55)",
+  "hsl(var(--primary) / 0.35)",
+]
 
-function formatCurrencyBRL(value: number) {
-  return `R$ ${Number(value ?? 0).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
+const card = "rounded-2xl bg-card p-5 shadow-elegant"
 
-function EmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
+function Kpi({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="flex h-[300px] w-full flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-6 text-center">
-      <p className="font-display text-base font-semibold">{title}</p>
-      {subtitle ? (
-        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-      ) : null}
+    <div className={card}>
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-1 font-display text-3xl font-semibold tabular-nums">{value}</p>
+      {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
     </div>
   )
 }
 
-function CustomTooltip({
-  active,
-  payload,
-  label,
-  total,
-  labelPrefix,
-  labelSuffix,
-}: any) {
-  if (!active || !payload?.length) return null
-
-  const value = payload[0]?.value ?? 0
-  const pct = total > 0 ? (value / total) * 100 : 0
-
+function BarCard({ title, rows, colorful }: { title: string; rows: ChartRow[]; colorful?: boolean }) {
+  if (!rows.length) return null
+  const height = Math.max(120, rows.length * 36 + 16)
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-sm">
-      <p className="text-xs text-muted-foreground">
-        {labelPrefix ? `${labelPrefix}: ` : ""}
-        <span className="font-medium text-foreground">
-          {label}
-          {labelSuffix ?? ""}
-        </span>
-      </p>
-      <p className="mt-1 text-sm font-semibold text-foreground">
-        {value} moeda{value === 1 ? "" : "s"}{" "}
-        <span className="text-xs font-normal text-muted-foreground">
-          ({pct.toFixed(0)}%)
-        </span>
-      </p>
-    </div>
+    <section className={card} aria-label={title}>
+      <h2 className="font-display text-lg font-semibold">{title}</h2>
+      <ChartContainer config={{}} className="mt-3 aspect-auto w-full" style={{ height }} aria-hidden="true">
+        <BarChart data={rows} layout="vertical" margin={{ left: 0, right: 28 }}>
+          <XAxis type="number" hide />
+          <YAxis
+            type="category"
+            dataKey="label"
+            width={96}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+          />
+          <Bar dataKey="count" radius={6} barSize={20}>
+            {rows.map((r, i) => (
+              <Cell key={r.label} fill={colorful ? PALETTE[i % PALETTE.length] : PALETTE[0]} />
+            ))}
+            <LabelList dataKey="count" position="right" fill="hsl(var(--muted-foreground))" fontSize={12} />
+          </Bar>
+        </BarChart>
+      </ChartContainer>
+      <ul className="sr-only">
+        {rows.map((r) => (
+          <li key={r.label}>
+            {r.label}: {r.count}
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
-function DonutCenterLabel({
-  total,
-  primary,
-  secondary,
-}: {
-  total: number
-  primary: string
-  secondary: string
-}) {
-  return (
-    <g>
-      <text
-        x="50%"
-        y="48%"
-        textAnchor="middle"
-        dominantBaseline="middle"
-        className="fill-foreground"
-        style={{ fontSize: 18, fontWeight: 800 }}
-      >
-        {primary}
-      </text>
-      <text
-        x="50%"
-        y="60%"
-        textAnchor="middle"
-        dominantBaseline="middle"
-        className="fill-muted-foreground"
-        style={{ fontSize: 12, fontWeight: 500 }}
-      >
-        {secondary}
-      </text>
-      <text
-        x="50%"
-        y="72%"
-        textAnchor="middle"
-        dominantBaseline="middle"
-        className="fill-muted-foreground"
-        style={{ fontSize: 11 }}
-      >
-        Total: {total}
-      </text>
-    </g>
-  )
-}
+export default function Dashboard() {
+  const [importOpen, setImportOpen] = useState(false)
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["dashboard-summary"],
+    queryFn: dashboardApi.getSummary,
+  })
 
-export default function AdminDashboard() {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        const data = await dashboardApi.getSummary()
-        setSummary(data)
-      } catch (err) {
-        // Demo data (fallback)
-        setSummary({
-          total_items: 120,
-          total_pieces: 156,
-          total_for_sale: 8,
-          total_invested: 30000,
-          by_category: [],
-          recent: [],
-          total_countries: 42,
-          total_estimated_value: 45780,
-          by_country: [
-            { country: "Brasil", count: 35 },
-            { country: "Portugal", count: 28 },
-            { country: "EUA", count: 22 },
-            { country: "França", count: 18 },
-            { country: "Outros", count: 53 },
-          ],
-          by_year: [
-            { year: 1800, count: 12 },
-            { year: 1850, count: 25 },
-            { year: 1900, count: 45 },
-            { year: 1950, count: 38 },
-            { year: 2000, count: 36 },
-          ],
-          by_originality: [
-            { originality: "Original", count: 98 },
-            { originality: "Réplica", count: 35 },
-            { originality: "Restaurada", count: 23 },
-          ],
-        } as any)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchSummary()
-  }, [])
-
-  const computed = useMemo(() => {
-    if (!summary) return null
-
-    const totalCoins = summary.total_pieces ?? 0
-    const totalEstimated = summary.total_estimated_value ?? 0
-
-    const byCountry = [...(summary.by_country ?? [])].sort(
-      (a, b) => (b.count ?? 0) - (a.count ?? 0)
-    )
-    const byYear = [...(summary.by_year ?? [])].sort(
-      (a, b) => (a.year ?? 0) - (b.year ?? 0)
-    )
-    const byOriginality = [...(summary.by_originality ?? [])].sort(
-      (a, b) => (b.count ?? 0) - (a.count ?? 0)
-    )
-
-    const originals = summary.total_originals ?? 0
-    const replicas = summary.total_replicas ?? 0
-
-    const originalsPct = totalCoins > 0 ? (originals / totalCoins) * 100 : 0
-    const replicasPct = totalCoins > 0 ? (replicas / totalCoins) * 100 : 0
-    const avgValue = totalCoins > 0 ? totalEstimated / totalCoins : 0
-
-    const topCountry = byCountry[0]
-    const topYear = (() => {
-      if (!byYear.length) return null
-      const max = [...byYear].sort((a, b) => (b.count ?? 0) - (a.count ?? 0))[0]
-      return max
-    })()
-
-    const oldestYear = byYear[0]?.year
-    const newestYear = byYear[byYear.length - 1]?.year
-
-    const topCountries = byCountry.slice(0, 5)
-
-    return {
-      totalCoins,
-      totalEstimated,
-      byCountry,
-      byYear,
-      byOriginality,
-      originals,
-      replicas,
-      originalsPct,
-      replicasPct,
-      avgValue,
-      topCountry,
-      topYear,
-      oldestYear,
-      newestYear,
-      topCountries,
-    }
-  }, [summary])
-
-  if (loading) {
+  if (isLoading)
     return (
-      <div className="flex items-center justify-center py-32">
-        <Loader2 className="h-8 w-8 animate-spin text-gold" />
-      </div>
-    )
-  }
-
-  if (!summary || !computed) return null
-
-  const statCards = [
-    {
-      title: "Total de Moedas",
-      value: computed.totalCoins,
-      icon: Coins,
-      color: "text-gold",
-      bgColor: "bg-gold/10",
-    },
-    {
-      title: "Países",
-      value: summary.total_countries ?? 0,
-      icon: Globe,
-      color: "text-blue-500",
-      bgColor: "bg-blue-500/10",
-    },
-    {
-      title: "Valor Estimado",
-      value: formatCurrencyBRL(computed.totalEstimated),
-      icon: DollarSign,
-      color: "text-green-500",
-      bgColor: "bg-green-500/10",
-    },
-    {
-      title: "Valor Médio",
-      value: formatCurrencyBRL(computed.avgValue),
-      icon: TrendingUp,
-      color: "text-purple-500",
-      bgColor: "bg-purple-500/10",
-    },
-    {
-      title: "Originais",
-      value: computed.originals,
-      icon: Percent,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-600/10",
-      sub: `${computed.originalsPct.toFixed(0)}%`,
-    },
-    {
-      title: "Réplicas",
-      value: computed.replicas,
-      icon: Copy,
-      color: "text-orange-500",
-      bgColor: "bg-orange-500/10",
-      sub: `${computed.replicasPct.toFixed(0)}%`,
-    },
-    {
-      title: "Ano mais antigo",
-      value: computed.oldestYear ?? "—",
-      icon: Calendar,
-      color: "text-sky-500",
-      bgColor: "bg-sky-500/10",
-    },
-    {
-      title: "Ano mais recente",
-      value: computed.newestYear ?? "—",
-      icon: Calendar,
-      color: "text-indigo-500",
-      bgColor: "bg-indigo-500/10",
-    },
-  ]
-
-  const hasCountryData = (computed.byCountry?.length ?? 0) > 0
-  const hasYearData = (computed.byYear?.length ?? 0) > 0
-  const hasOriginalityData = (computed.byOriginality?.length ?? 0) > 0
-
-  return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="font-display text-3xl font-bold text-foreground">
-            Dashboard
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Visão geral da sua coleção de moedas
-          </p>
+      <div className="space-y-6" aria-busy="true">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+          {Array.from({ length: 5 }, (_, i) => (
+            <Skeleton key={i} className="h-28 rounded-2xl" />
+          ))}
         </div>
       </div>
+    )
 
-      {/* Stats */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat, index) => (
-          <Card
-            key={stat.title}
-            className="border-border animate-fadeIn"
-            style={{ animationDelay: `${index * 60}ms` }}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.bgColor}`}
+  if (isError || !data)
+    return (
+      <div className={`${card} text-center`} role="alert">
+        <p>Não foi possível carregar o painel.</p>
+        <Button className="mt-3 min-h-11" onClick={() => refetch()}>
+          Tentar novamente
+        </Button>
+      </div>
+    )
+
+  if (data.total_items === 0)
+    return (
+      <div className={`${card} mx-auto max-w-xl py-12 text-center`}>
+        <h1 className="font-display text-2xl font-semibold">Bem-vindo à sua coleção</h1>
+        <p className="mt-2 text-muted-foreground">
+          Ainda não há moedas cadastradas. Comece cadastrando uma ou importando sua planilha.
+        </p>
+        <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+          <Button asChild className="min-h-11 rounded-full">
+            <Link to="/admin/coins/new">Cadastrar primeira moeda</Link>
+          </Button>
+          <Button variant="outline" className="min-h-11 rounded-full" onClick={() => setImportOpen(true)}>
+            Importar planilha
+          </Button>
+        </div>
+        <ImportDialog
+          open={importOpen}
+          onOpenChange={(o) => {
+            setImportOpen(o)
+            if (!o) refetch()
+          }}
+        />
+      </div>
+    )
+
+  const countries = topN(
+    data.by_country.map((c) => ({ label: c.country, count: c.count })),
+    10,
+  )
+  const originality = data.by_originality.map((o) => ({
+    label: originalityLabel(o.originality),
+    count: o.count,
+  }))
+  const categories = data.by_category.map((c) => ({ label: c.category, count: c.count }))
+
+  return (
+    <div className="space-y-6">
+      <h1 className="font-display text-2xl font-semibold">Painel</h1>
+
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+        <Kpi label="Peças" value={data.total_pieces} sub={`${data.total_items} moedas cadastradas`} />
+        <Kpi label="Países" value={data.total_countries} />
+        <Kpi label="Valor estimado" value={formatBRL(data.total_estimated_value)} />
+        <Kpi label="Investido" value={formatBRL(data.total_invested)} />
+        <Kpi label="À venda" value={data.total_for_sale} sub="moedas" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <BarCard title="Por país" rows={countries} colorful />
+        <BarCard title="Por década" rows={groupByDecade(data.by_year)} />
+        <BarCard title="Por originalidade" rows={originality} colorful />
+        <BarCard title="Por categoria" rows={categories} colorful />
+      </div>
+
+      <section className={card} aria-label="Adicionadas recentemente">
+        <h2 className="font-display text-lg font-semibold">Adicionadas recentemente</h2>
+        <ul className="mt-3 divide-y divide-border">
+          {data.recent.map((c) => {
+            const img = resolveImageUrl(c.image_url_front)
+            return (
+              <li key={c.id}>
+                <Link
+                  to={`/admin/coins/edit/${c.id}`}
+                  className="flex min-h-11 items-center gap-3 py-2 hover:text-foreground/80"
                 >
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm text-muted-foreground">{stat.title}</p>
-                  <p className="truncate font-display text-2xl font-bold">
-                    {stat.value}
-                  </p>
-                  {"sub" in stat && stat.sub ? (
-                    <p className="text-xs text-muted-foreground">
-                      {stat.sub as any}
+                  <div className="coin-stage h-12 w-12 shrink-0 overflow-hidden rounded-full">
+                    {img && <img src={img} alt={`Moeda ${c.title}`} className="h-full w-full object-cover" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{c.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {c.country} · {c.year}
                     </p>
-                  ) : null}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Insights + Top Countries */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="border-border lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-display">Insights rápidos</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap gap-3">
-              <div className="rounded-xl border border-border bg-muted/20 px-3 py-2">
-                <p className="text-xs text-muted-foreground">
-                  País com mais moedas
-                </p>
-                <p className="font-semibold">
-                  {computed.topCountry?.country ?? "—"}{" "}
-                  {computed.topCountry?.count != null
-                    ? `(${computed.topCountry.count})`
-                    : ""}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-border bg-muted/20 px-3 py-2">
-                <p className="text-xs text-muted-foreground">Ano mais comum</p>
-                <p className="font-semibold">
-                  {computed.topYear?.year ?? "—"}{" "}
-                  {computed.topYear?.count != null
-                    ? `(${computed.topYear.count})`
-                    : ""}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-border bg-muted/20 px-3 py-2">
-                <p className="text-xs text-muted-foreground">Distribuição</p>
-                <p className="font-semibold">
-                  {computed.originals} originais • {computed.replicas} réplicas
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-border bg-muted/20 px-3 py-2">
-                <p className="text-xs text-muted-foreground">Valor médio</p>
-                <p className="font-semibold">
-                  {formatCurrencyBRL(computed.avgValue)}
-                </p>
-              </div>
-            </div>
-
-            {computed.totalCoins <= 2 ? (
-              <div className="rounded-xl border border-dashed border-border bg-muted/10 px-4 py-3 text-sm text-muted-foreground">
-                Sua coleção ainda tem poucos itens. Conforme você adicionar mais
-                moedas, os gráficos vão revelar padrões por país e ano.
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="font-display">Top países</CardTitle>
-            <Trophy className="h-5 w-5 text-gold" />
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {computed.topCountries.length ? (
-              <div className="space-y-2">
-                {computed.topCountries.map((c, idx) => {
-                  const pct =
-                    computed.totalCoins > 0
-                      ? (c.count / computed.totalCoins) * 100
-                      : 0
-                  return (
-                    <div
-                      key={`${c.country}-${idx}`}
-                      className="rounded-xl border border-border bg-muted/10 px-3 py-2"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="truncate font-medium">{c.country}</p>
-                        <p className="whitespace-nowrap text-sm text-muted-foreground">
-                          {c.count} • {pct.toFixed(0)}%
-                        </p>
-                      </div>
-                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-gold"
-                          style={{ width: `${Math.min(100, pct)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Sem dados por país ainda.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* By Country Bar Chart */}
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle className="font-display">Moedas por País</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!hasCountryData ? (
-              <EmptyState
-                title="Sem dados por país"
-                subtitle="Cadastre moedas com o campo de país para ver a distribuição."
-              />
-            ) : (
-              <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={computed.byCountry.slice(0, 10)}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
-                    />
-                    <XAxis dataKey="country" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      content={(props) => (
-                        <CustomTooltip
-                          {...props}
-                          total={computed.totalCoins}
-                          labelPrefix="País"
-                        />
-                      )}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill="hsl(var(--gold))"
-                      radius={[6, 6, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* By Originality Donut */}
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle className="font-display">Por Originalidade</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!hasOriginalityData ? (
-              <EmptyState
-                title="Sem dados de originalidade"
-                subtitle="Cadastre moedas com o campo de originalidade para ver a proporção."
-              />
-            ) : (
-              <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={computed.byOriginality}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={70}
-                      outerRadius={110}
-                      paddingAngle={4}
-                      dataKey="count"
-                      nameKey="originality"
-                      isAnimationActive
-                    >
-                      {computed.byOriginality.map((_, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-
-                    {/* Center label */}
-                    <DonutCenterLabel
-                      total={computed.totalCoins}
-                      primary={`${computed.originals} / ${computed.totalCoins}`}
-                      secondary="Originais"
-                    />
-
-                    <Tooltip
-                      content={(props: any) => {
-                        const p = props?.payload?.[0]?.payload
-                        if (!props.active || !p) return null
-                        const value = p.count ?? 0
-                        const pct =
-                          computed.totalCoins > 0
-                            ? (value / computed.totalCoins) * 100
-                            : 0
-                        return (
-                          <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-sm">
-                            <p className="text-xs text-muted-foreground">
-                              Tipo:{" "}
-                              <span className="font-medium text-foreground">
-                                {p.originality}
-                              </span>
-                            </p>
-                            <p className="mt-1 text-sm font-semibold text-foreground">
-                              {value} moeda{value === 1 ? "" : "s"}{" "}
-                              <span className="text-xs font-normal text-muted-foreground">
-                                ({pct.toFixed(0)}%)
-                              </span>
-                            </p>
-                          </div>
-                        )
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* By Year Bar Chart */}
-        <Card className="border-border lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-display">Distribuição por Ano</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!hasYearData ? (
-              <EmptyState
-                title="Sem dados por ano"
-                subtitle="Cadastre moedas com o campo de ano para ver a distribuição."
-              />
-            ) : (
-              <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={computed.byYear}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
-                    />
-                    <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      content={(props) => (
-                        <CustomTooltip
-                          {...props}
-                          total={computed.totalCoins}
-                          labelPrefix="Ano"
-                        />
-                      )}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill="hsl(var(--gold))"
-                      radius={[6, 6, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  </div>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
     </div>
   )
 }
