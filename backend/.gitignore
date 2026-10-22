@@ -23,7 +23,7 @@ Thumbs.db
 .env
 .env.*
 secrets.py
-config.py  # If it contains sensitive information
+!.env.example
 
 # Database files (if using local files like SQLite)
 *.sqlite3
