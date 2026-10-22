@@ -114,12 +114,17 @@ export interface CoinAdjust {
 export interface DashboardSummary {
   total_replicas: number
   total_originals: number
-  total_coins: number
+  total_items: number
+  total_pieces: number
   total_countries: number
+  total_for_sale: number
   total_estimated_value: number
+  total_invested: number
   by_country: { country: string; count: number }[]
   by_year: { year: number; count: number }[]
   by_originality: { originality: string; count: number }[]
+  by_category: { category: string; count: number }[]
+  recent: Coin[]
 }
 
 export interface Token {

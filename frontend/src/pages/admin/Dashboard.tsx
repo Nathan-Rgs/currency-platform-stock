@@ -134,7 +134,12 @@ export default function AdminDashboard() {
       } catch (err) {
         // Demo data (fallback)
         setSummary({
-          total_coins: 156,
+          total_items: 120,
+          total_pieces: 156,
+          total_for_sale: 8,
+          total_invested: 30000,
+          by_category: [],
+          recent: [],
           total_countries: 42,
           total_estimated_value: 45780,
           by_country: [
@@ -168,7 +173,7 @@ export default function AdminDashboard() {
   const computed = useMemo(() => {
     if (!summary) return null
 
-    const totalCoins = summary.total_coins ?? 0
+    const totalCoins = summary.total_pieces ?? 0
     const totalEstimated = summary.total_estimated_value ?? 0
 
     const byCountry = [...(summary.by_country ?? [])].sort(
