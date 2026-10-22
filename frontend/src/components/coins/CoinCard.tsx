@@ -1,75 +1,74 @@
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-import { Coin } from "@/lib/api"
-import { formatBRL, originalityLabel, resolveImageUrl } from "@/lib/coin-format"
+import { CoinPublic } from "@/lib/api"
+import { formatBRL, resolveImageUrl } from "@/lib/coin-format"
 import { ImageIcon } from "lucide-react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
 
-interface CoinCardProps {
-  coin: Coin
-}
-
-export function CoinCard({ coin }: CoinCardProps) {
-  const imageUrl = resolveImageUrl((coin as any).image_url_front)
-  const quantity = Number((coin as any).quantity ?? 0)
+export function CoinCard({ coin }: { coin: CoinPublic }) {
+  const front = resolveImageUrl(coin.image_url_front)
+  const back = resolveImageUrl(coin.image_url_back)
+  const [frontFailed, setFrontFailed] = useState(false)
+  const [backFailed, setBackFailed] = useState(false)
+  const showFront = !!front && !frontFailed
+  const showBack = showFront && !!back && !backFailed
 
   return (
-    <Link to={`/coins/${coin.id}`}>
-      <Card className="group overflow-hidden border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-elegant">
-        <div className="relative aspect-square overflow-hidden bg-secondary">
-          {imageUrl ? (
+    <Link
+      to={`/coins/${coin.id}`}
+      className="group flex flex-col overflow-hidden rounded-2xl bg-card shadow-elegant transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="coin-stage relative flex h-[220px] items-center justify-center p-4">
+        {showFront ? (
+          <>
             <img
-              src={imageUrl}
-              alt={`${coin.country} ${coin.year}`}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-              onError={(e) => {
-                // força fallback: remove src inválido
-                ;(e.currentTarget as HTMLImageElement).src = ""
-              }}
+              src={front}
+              alt={`${coin.title}, frente`}
+              loading="lazy"
+              onError={() => setFrontFailed(true)}
+              className={`h-full w-full object-contain transition-opacity duration-300 ${
+                showBack ? "group-hover:opacity-0" : ""
+              }`}
             />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <ImageIcon className="h-16 w-16 text-muted-foreground/30" />
-            </div>
-          )}
-
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-charcoal/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-
-          {/* Originalidade */}
-          <Badge className="absolute left-2 top-2 bg-black/60 text-white backdrop-blur border-0">
-            {originalityLabel((coin as any).originality)}
-          </Badge>
-
-          {/* Quantidade disponível */}
-          <Badge className="absolute right-2 top-2 bg-gold/90 text-charcoal border-0">
-            {Number.isFinite(quantity) && quantity > 0
-              ? `${quantity} disponível`
-              : "Indisponível"}
-          </Badge>
+            {showBack && (
+              <img
+                src={back}
+                alt={`${coin.title}, verso`}
+                loading="lazy"
+                onError={() => setBackFailed(true)}
+                className="absolute inset-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+              />
+            )}
+          </>
+        ) : (
+          <div
+            role="img"
+            aria-label="Sem foto"
+            className="flex h-32 w-32 items-center justify-center rounded-full bg-muted"
+          >
+            <ImageIcon className="h-10 w-10 text-muted-foreground/50" />
+          </div>
+        )}
+        {coin.for_sale && coin.sale_price != null && (
+          <span className="absolute right-3 top-3 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground">
+            {formatBRL(coin.sale_price)}
+          </span>
+        )}
+      </div>
+      <div className="flex items-end justify-between gap-2 px-4 pb-4 pt-3.5">
+        <div className="min-w-0">
+          <h3 className="truncate font-display text-lg font-semibold text-foreground">
+            {coin.title}
+          </h3>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            {coin.country} · {coin.year}
+          </p>
         </div>
-
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <h3 className="truncate font-display text-lg font-semibold text-foreground">
-                {coin.title}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {coin.country} • {coin.year} • {(coin as any).face_value ?? "—"}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-              Valor estimado
-            </span>
-            <span className="font-display text-lg font-semibold text-gold">
-              {formatBRL((coin as any).estimated_value)}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+        {coin.condition && (
+          <span className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+            {coin.condition}
+          </span>
+        )}
+      </div>
     </Link>
   )
 }
