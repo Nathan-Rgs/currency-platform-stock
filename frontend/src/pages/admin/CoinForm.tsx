@@ -35,7 +35,7 @@ import { useForm, useFormContext } from "react-hook-form"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 const apiErrorDetail = (e: unknown) =>
-  apiErrorMessage(e, "Falha de conexão. Tente novamente.")
+  apiErrorMessage(e, "Não foi possível salvar. Tente novamente.")
 
 const inputClass = "h-[46px] rounded-xl border-border text-base md:text-base"
 const labelClass = "text-xs font-normal text-muted-foreground"

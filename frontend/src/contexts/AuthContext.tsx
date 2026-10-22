@@ -68,9 +68,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     checkAuth();
 
-    // Periodically check token validity every minute
-    const interval = setInterval(checkAuth, 60000);
-    return () => clearInterval(interval);
+    // Pick up a token saved by a re-login in another tab.
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'access_token' || e.key === null) checkAuth();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', checkAuth);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', checkAuth);
+    };
   }, []);
 
   const login = async (username: string, password: string) => {

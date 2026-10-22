@@ -12,3 +12,6 @@ it("sem configuração devolve null", () =>
 it("mailto com assunto", () =>
   expect(buildContactLinks(coin, "u", { email: "a@b.com" }).email)
     .toBe("mailto:a@b.com?subject=" + encodeURIComponent("Interesse: 20 Réis 1889") + "&body=" + encodeURIComponent('Olá! Tenho interesse na moeda "20 Réis 1889": u')))
+it("sanitiza o número do WhatsApp", () =>
+  expect(buildContactLinks(coin, "u", { whatsapp: "+55 (11) 99999-9999" }).whatsapp)
+    .toMatch(/^https:\/\/wa\.me\/5511999999999\?/))

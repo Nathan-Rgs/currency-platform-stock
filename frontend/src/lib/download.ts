@@ -9,7 +9,7 @@ export function downloadBlob(blob: Blob, filename: string) {
   document.body.appendChild(a)
   a.click()
   a.remove()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 // Blob responses (export/template) carry JSON error bodies: parse them, then

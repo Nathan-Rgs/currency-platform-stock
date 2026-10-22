@@ -23,7 +23,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem("access_token")
       const { pathname, search } = window.location
-      if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+      // Only GETs redirect; writes keep the page so typed data isn't lost.
+      const isGet = (error.config?.method ?? "get").toLowerCase() === "get"
+      if (isGet && pathname.startsWith("/admin") && pathname !== "/admin/login") {
         window.location.assign(
           `/admin/login?next=${encodeURIComponent(pathname + search)}`,
         )

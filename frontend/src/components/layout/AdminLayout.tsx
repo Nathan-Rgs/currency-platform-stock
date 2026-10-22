@@ -20,7 +20,10 @@ export function AdminLayout() {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate
+      to={`/admin/login?next=${encodeURIComponent(location.pathname + location.search)}`}
+      replace
+    />;
   }
 
   return (

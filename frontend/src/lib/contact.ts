@@ -11,10 +11,11 @@ export function buildContactLinks(
     email: import.meta.env.VITE_CONTACT_EMAIL,
   },
 ): { whatsapp: string | null; email: string | null } {
+  const phone = env.whatsapp?.replace(/\D/g, "")
   const text = `Olá! Tenho interesse na moeda "${coin.title}": ${pageUrl}`
   return {
-    whatsapp: env.whatsapp
-      ? `https://wa.me/${env.whatsapp}?text=${encodeURIComponent(text)}`
+    whatsapp: phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
       : null,
     email: env.email
       ? `mailto:${env.email}?subject=${encodeURIComponent(`Interesse: ${coin.title}`)}&body=${encodeURIComponent(text)}`

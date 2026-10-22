@@ -17,7 +17,12 @@ const optionalNumber = z
   .string()
   .optional()
   .transform((v, ctx) => {
-    const s = (v ?? "").trim().replace(",", ".")
+    const raw = (v ?? "").trim()
+    if (/^\d{1,3}(\.\d{3})+$/.test(raw)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Use vírgula para decimais (ex.: 1500 ou 1500,00)" })
+      return z.NEVER
+    }
+    const s = raw.replace(",", ".")
     if (!s) return null
     const n = Number(s)
     if (!Number.isFinite(n) || n < 0) {

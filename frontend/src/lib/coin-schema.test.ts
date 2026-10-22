@@ -48,3 +48,13 @@ it("coinToFormValues converte a moeda em strings do form", () => {
     estimated_value: "", for_sale: true, sale_price: "90" })
   expect(coinFormSchema.parse(v).weight_g).toBe(4.27)
 })
+
+it("rejeita milhar pt-BR ambíguo", () => {
+  for (const v of ["1.234", "1.500"]) {
+    const r = coinFormSchema.safeParse({ ...base, purchase_price: v })
+    expect(r.success).toBe(false)
+    expect(r.error?.issues[0].message).toBe("Use vírgula para decimais (ex.: 1500 ou 1500,00)")
+  }
+})
+it("mantém ponto decimal curto", () =>
+  expect(coinFormSchema.parse({ ...base, purchase_price: "10.50" }).purchase_price).toBe(10.5))
