@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 from models.coin import OriginalityEnum
 
 def _check_year(v):
@@ -84,6 +84,35 @@ class CoinRead(BaseModelWithOrm, CoinBase):
     owner_id: int
     created_at: datetime
     updated_at: datetime
+
+
+class CoinPublic(BaseModelWithOrm):
+    """Anonymous-safe coin view. Never add private fields here (see D2)."""
+    id: int
+    title: str
+    quantity: int
+    year: int
+    country: str
+    face_value: str
+    originality: OriginalityEnum
+    condition: Optional[str] = None
+    category: Optional[str] = None
+    catalog_ref: Optional[str] = None
+    material: Optional[str] = None
+    diameter_mm: Optional[float] = None
+    weight_g: Optional[float] = None
+    mint_mark: Optional[str] = None
+    for_sale: bool
+    sale_price: Optional[float] = None
+    public_description: Optional[str] = None
+    image_url_front: Optional[str] = None
+    image_url_back: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _hide_price_unless_for_sale(self):
+        if not self.for_sale:
+            self.sale_price = None
+        return self
 
 
 class CoinAdjust(BaseModel):

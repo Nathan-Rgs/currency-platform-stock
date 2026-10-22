@@ -15,7 +15,7 @@ from fastapi import (
     File,
 )
 from fastapi.responses import JSONResponse, StreamingResponse
-from sqlalchemy import func, select, or_
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.database import get_db
@@ -23,7 +23,8 @@ from core.security import get_current_active_user
 from models.coin import Coin, OriginalityEnum
 from models.user import User
 from schemas.coin import CoinCreate, CoinRead, CoinUpdate
-from schemas.common import PaginatedResponse, PaginationMeta
+from schemas.common import PaginatedResponse
+from repositories.coin_repo import CoinSort, apply_coin_filters, paginate_coins
 
 router = APIRouter(prefix="/coins", tags=["coins"])
 MEDIA_DIR = "media/coins"
@@ -72,60 +73,36 @@ def list_coins(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     country: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
     year_from: Optional[int] = Query(None),
     year_to: Optional[int] = Query(None),
     originality: Optional[OriginalityEnum] = Query(None),
-    search: Optional[str] = Query(None, description="Search in country, value, and notes"),
+    for_sale: Optional[bool] = Query(None),
+    sort: CoinSort = Query("created_desc"),
+    search: Optional[str] = Query(None, description="Search in title, country, value, catalog ref and notes"),
 ):
-    base_query = select(Coin).where(Coin.owner_id == current_user.id)
-
-    if country:
-        base_query = base_query.where(Coin.country.ilike(f"%{country}%"))
-    if year_from is not None:
-        base_query = base_query.where(Coin.year >= year_from)
-    if year_to is not None:
-        base_query = base_query.where(Coin.year <= year_to)
-    if originality:
-        base_query = base_query.where(Coin.originality == originality)
-    if search:
-        like = f"%{search}%"
-        base_query = base_query.where(
-            or_(Coin.title.ilike(like), Coin.country.ilike(like), Coin.face_value.ilike(like), Coin.notes.ilike(like))
-        )
-
-    count_query = select(func.count()).select_from(base_query.subquery())
-    total_items = db.scalar(count_query) or 0
-    total_pages = (total_items + page_size - 1) // page_size
-
-    items_query = (
-        base_query.order_by(Coin.year.desc(), Coin.country)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
+    query = apply_coin_filters(
+        select(Coin).where(Coin.owner_id == current_user.id),
+        search=search,
+        search_private=True,
+        country=country,
+        category=category,
+        year_from=year_from,
+        year_to=year_to,
+        originality=originality,
+        for_sale=for_sale,
+        sort=sort,
     )
-    coins = db.execute(items_query).scalars().all()
-
-    meta = PaginationMeta(page=page, page_size=page_size, total_items=total_items, total_pages=total_pages)
-    return PaginatedResponse(data=coins, meta=meta)
-
-
-def get_public_coin_or_404(db: Session, coin_id: int) -> Coin:
-    """Busca uma moeda pelo ID. Falha com 404 caso contrário."""
-    query = select(Coin).where(Coin.id == coin_id)
-    coin = db.execute(query).scalars().first()
-    if not coin:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Coin not found"
-        )
-    return coin
+    return paginate_coins(db, query, page, page_size)
 
 
 @router.get("/{coin_id}", response_model=CoinRead)
 def get_coin_by_id(
     coin_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    coin = get_public_coin_or_404(db, coin_id)
-    return coin
+    return get_coin_or_404(db, coin_id, current_user.id)
 
 
 def coin_to_dict(coin: Coin) -> dict:
