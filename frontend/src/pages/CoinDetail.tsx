@@ -1,407 +1,268 @@
+import { PublicFooter } from "@/components/layout/PublicFooter"
 import { PublicHeader } from "@/components/layout/PublicHeader"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Coin, coinsApi } from "@/lib/api"
-import { formatBRL, originalityBadgeClasses, originalityLabel, resolveImageUrl } from "@/lib/coin-format"
-import {
-  Archive,
-  ArrowLeft,
-  Boxes,
-  Calendar,
-  CircleDollarSign,
-  HandCoins,
-  ImageIcon,
-  Info,
-  Loader2,
-  MapPin,
-  ShieldCheck,
-  Tag,
-} from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { publicApi } from "@/lib/api"
+import { BRAND_NAME } from "@/lib/brand"
+import { formatBRL, originalityLabel, resolveImageUrl } from "@/lib/coin-format"
+import { buildContactLinks } from "@/lib/contact"
+import { cn } from "@/lib/utils"
+import { useQuery } from "@tanstack/react-query"
+import { isAxiosError } from "axios"
+import { ImageIcon, Loader2, Mail, MessageCircle, Maximize2 } from "lucide-react"
+import { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 
-function formatDateTime(iso?: string | null) {
-  if (!iso) return "—"
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return "—"
-  return d.toLocaleString("pt-BR")
+type Side = "front" | "back"
+
+const chip = "rounded-full px-2.5 py-1 text-xs"
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-background">
+      <PublicHeader />
+      {children}
+      <PublicFooter />
+    </div>
+  )
 }
 
 export default function CoinDetail() {
   const { id } = useParams<{ id: string }>()
-  const [coin, setCoin] = useState<Coin | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [activeImage, setActiveImage] = useState<"front" | "back">("front")
-  const [frontFailed, setFrontFailed] = useState(false)
-  const [backFailed, setBackFailed] = useState(false)
+  const [side, setSide] = useState<Side>("front")
+  const [zoom, setZoom] = useState(false)
+  const [failed, setFailed] = useState<Record<Side, boolean>>({ front: false, back: false })
+
+  const coinId = Number(id)
+  const validId = Number.isInteger(coinId)
+  const query = useQuery({
+    queryKey: ["public-coin", coinId],
+    queryFn: () => publicApi.get(coinId),
+    enabled: validId,
+    retry: (count, err) => !(isAxiosError(err) && err.response?.status === 404) && count < 2,
+  })
+  const coin = query.data
 
   useEffect(() => {
-    const fetchCoin = async () => {
-      if (!id) return
+    if (coin) document.title = `${coin.title} — ${BRAND_NAME}`
+  }, [coin])
 
-                try {
-                  const data: any = await coinsApi.get(parseInt(id))
-                  setCoin(data)
-                } catch {
-                  // If the request fails, navigate back to the home page or show an error
-                  // toast({
-                  //   title: "Erro",
-                  //   description: "Moeda não encontrada.",
-                  //   variant: "destructive",
-                  // });
-                  // navigate("/");
-                  setCoin(null) // explicitly set to null to trigger "Coin not found" message
-                } finally {
-                  setLoading(false)
-                }
-              }
-          
-              fetchCoin()
-            }, [id])
-          
-            const images = useMemo(() => {
-              const c: any = coin
-              return {
-                front: resolveImageUrl(c?.image_url_front),
-                back: resolveImageUrl(c?.image_url_back),
-              }
-            }, [coin])
-          
-            const activeImageUrl = activeImage === "front" ? images.front : images.back
-            const activeFailed = activeImage === "front" ? frontFailed : backFailed
-          
-            if (loading) {
-              return (
-                <div className="min-h-screen bg-background">
-                  <PublicHeader />
-                  <div className="flex items-center justify-center py-32">
-                    <Loader2 className="h-8 w-8 animate-spin text-gold" />
-                  </div>
+  // Reset image state when navigating to another coin.
+  useEffect(() => {
+    setSide("front")
+    setFailed({ front: false, back: false })
+  }, [coinId])
+
+  if (validId && query.isPending) {
+    return (
+      <Shell>
+        <div className="flex justify-center py-32" role="status" aria-label="Carregando">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </Shell>
+    )
+  }
+
+  const notFound = !validId || (isAxiosError(query.error) && query.error.response?.status === 404)
+
+  if (notFound) {
+    return (
+      <Shell>
+        <main className="container py-20 text-center">
+          <h1 className="font-display text-3xl font-semibold">Moeda não encontrada</h1>
+          <Link to="/" className="mt-4 inline-flex min-h-11 items-center text-gold-text underline">
+            Voltar à coleção
+          </Link>
+        </main>
+      </Shell>
+    )
+  }
+
+  if (query.isError || !coin) {
+    return (
+      <Shell>
+        <main className="container py-20 text-center">
+          <h1 className="font-display text-3xl font-semibold">Não foi possível carregar a moeda</h1>
+          <Button className="mt-4 min-h-11" onClick={() => query.refetch()}>
+            Tentar novamente
+          </Button>
+        </main>
+      </Shell>
+    )
+  }
+
+  const url = resolveImageUrl(side === "front" ? coin.image_url_front : coin.image_url_back)
+  const showImage = url && !failed[side]
+  const alt = `${coin.title} — ${side === "front" ? "Frente" : "Verso"}`
+  const links = coin.for_sale
+    ? buildContactLinks(coin, window.location.href)
+    : { whatsapp: null, email: null }
+
+  const specs: [string, string | null | undefined][] = [
+    ["Valor de face", coin.face_value],
+    ["Material", coin.material],
+    ["Diâmetro", coin.diameter_mm != null ? `${coin.diameter_mm} mm` : null],
+    ["Peso", coin.weight_g != null ? `${coin.weight_g} g` : null],
+    ["Casa da moeda", coin.mint_mark],
+    ["Categoria", coin.category],
+  ]
+
+  const segment = (active: boolean) =>
+    cn(
+      "h-11 rounded-full px-5 text-sm transition-colors",
+      active
+        ? "bg-primary font-medium text-primary-foreground"
+        : "text-muted-foreground hover:text-foreground",
+    )
+
+  return (
+    <Shell>
+      <main className="container px-4 py-6 sm:px-8 lg:px-14">
+        {/* ponytail: plain link to "/"; browser back already preserves gallery filters */}
+        <Link
+          to="/"
+          className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground"
+        >
+          ← Coleção
+        </Link>
+
+        <div className="mt-2 flex flex-col gap-8 lg:flex-row lg:items-center">
+          <div className="flex flex-1 flex-col items-center gap-6">
+            <div className="coin-stage flex aspect-square w-full max-w-[520px] items-center justify-center rounded-2xl p-6">
+              {showImage ? (
+                <img
+                  src={url}
+                  alt={alt}
+                  className="h-full w-full object-contain"
+                  onError={() => setFailed((f) => ({ ...f, [side]: true }))}
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                  <ImageIcon className="h-14 w-14 stroke-[1.5]" aria-hidden="true" />
+                  <span className="text-sm">
+                    Sem imagem {side === "front" ? "da frente" : "do verso"}
+                  </span>
                 </div>
-              )
-            }
-          
-            if (!coin) {
-              return (
-                <div className="min-h-screen bg-background">
-                  <PublicHeader />
-                  <div className="container py-20 text-center">
-                    <h1 className="font-display text-3xl font-bold">
-                      Moeda não encontrada
-                    </h1>
-                    <Link to="/" className="mt-4 inline-block text-gold hover:underline">
-                      Voltar à galeria
-                    </Link>
+              )}
+            </div>
+
+            <div className="flex gap-1 rounded-full bg-card p-1 shadow-elegant">
+              <button
+                type="button"
+                aria-pressed={side === "front"}
+                className={segment(side === "front")}
+                onClick={() => setSide("front")}
+              >
+                Frente
+              </button>
+              <button
+                type="button"
+                aria-pressed={side === "back"}
+                className={segment(side === "back")}
+                onClick={() => setSide("back")}
+              >
+                Verso
+              </button>
+              <button
+                type="button"
+                aria-label="Ampliar foto"
+                disabled={!showImage}
+                className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground disabled:opacity-40"
+                onClick={() => setZoom(true)}
+              >
+                <Maximize2 className="h-[18px] w-[18px]" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
+          <aside className="flex w-full flex-col gap-6 rounded-2xl bg-card p-6 shadow-[0_1px_2px_rgba(31,36,48,.05),0_20px_40px_rgba(31,36,48,.06)] sm:p-7 lg:w-[440px]">
+            <div className="flex flex-wrap gap-1.5">
+              <span
+                className={cn(
+                  chip,
+                  coin.originality?.toLowerCase() === "original"
+                    ? "bg-success-bg font-semibold text-success"
+                    : "bg-secondary text-foreground",
+                )}
+              >
+                {originalityLabel(coin.originality)}
+              </span>
+              {coin.condition && (
+                <span className={cn(chip, "bg-secondary text-foreground")}>{coin.condition}</span>
+              )}
+              {coin.catalog_ref && (
+                <span className={cn(chip, "bg-secondary text-foreground")}>{coin.catalog_ref}</span>
+              )}
+            </div>
+
+            <div>
+              <h1 className="font-display text-[32px] font-semibold leading-tight sm:text-[38px]">
+                {coin.title}
+              </h1>
+              <p className="mt-2 text-base text-muted-foreground">
+                {coin.country} · {coin.year}
+              </p>
+            </div>
+
+            <dl className="grid grid-cols-2 gap-2.5">
+              {specs.map(([k, v]) =>
+                v ? (
+                  <div key={k} className="rounded-xl bg-background px-3.5 py-3">
+                    <dt className="text-xs text-muted-foreground">{k}</dt>
+                    <dd className="mt-1 text-base font-semibold">{v}</dd>
                   </div>
+                ) : null,
+              )}
+            </dl>
+
+            {coin.public_description && (
+              <p className="whitespace-pre-line leading-relaxed text-muted-foreground">
+                {coin.public_description}
+              </p>
+            )}
+
+            {coin.for_sale && (
+              <div className="flex flex-col gap-3 border-t border-border pt-5">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[13px] text-muted-foreground">À venda</span>
+                  <span className="font-display text-4xl font-semibold">
+                    {formatBRL(coin.sale_price)}
+                  </span>
                 </div>
-              )
-            }
-          
-            const c: any = coin
-            const quantity = Number(c.quantity ?? 0)
-          
-            return (
-              <div className="min-h-screen bg-background">
-                <PublicHeader />
-          
-                <main className="container py-12">
-                  <Link to="/">
-                    <Button variant="ghost" className="mb-8 gap-2">
-                      <ArrowLeft className="h-4 w-4" />
-                      Voltar à galeria
-                    </Button>
-                  </Link>
-          
-                  <div className="grid gap-12 lg:grid-cols-2">
-                    {/* Imagens */}
-                    <div className="space-y-4">
-                      <div className="relative isolate aspect-square overflow-hidden rounded-2xl border border-border bg-secondary shadow-elegant">
-                        {activeImageUrl && !activeFailed ? (
-                          <img
-                            src={activeImageUrl}
-                            alt={`${c.country} ${c.year} - ${
-                              activeImage === "front" ? "Frente" : "Verso"
-                            }`}
-                            className="h-full w-full object-cover"
-                            onError={() =>
-                              activeImage === "front"
-                                ? setFrontFailed(true)
-                                : setBackFailed(true)
-                            }
-                          />
-                        ) : (
-                          <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-muted-foreground">
-                            <div className="rounded-xl bg-muted/60 p-4">
-                              <ImageIcon className="h-14 w-14 stroke-[1.5] text-foreground/60" />
-                            </div>
-                            <span className="text-sm">
-                              Sem imagem{" "}
-                              {activeImage === "front" ? "da frente" : "do verso"}
-                            </span>
-                          </div>
-                        )}
-          
-                        {/* Badge de quantidade em cima da imagem */}
-                        <Badge className="absolute right-3 top-3 bg-gold/90 text-charcoal border-0">
-                          {Number.isFinite(quantity) && quantity > 0
-                            ? `${quantity} disponível`
-                            : "Indisponível"}
-                        </Badge>
-                      </div>
-          
-                      <div className="flex gap-4">
-                        <button
-                          onClick={() => setActiveImage("front")}
-                          className={`flex-1 rounded-lg border-2 p-3 transition-all ${
-                            activeImage === "front"
-                              ? "border-gold bg-gold/10"
-                              : "border-border bg-card hover:border-gold/50"
-                          }`}
-                        >
-                          <span className="text-sm font-medium">Frente</span>
-                        </button>
-                        <button
-                          onClick={() => setActiveImage("back")}
-                          className={`flex-1 rounded-lg border-2 p-3 transition-all ${
-                            activeImage === "back"
-                              ? "border-gold bg-gold/10"
-                              : "border-border bg-card hover:border-gold/50"
-                          }`}
-                        >
-                          <span className="text-sm font-medium">Verso</span>
-                        </button>
-                      </div>
-          
-                      {/* Bloco orientado a compra: confiança/transparência */}
-                      <div className="rounded-xl border border-border bg-card p-5">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/10">
-                            <ShieldCheck className="h-5 w-5 text-gold" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="font-medium">Informações para compra</p>
-                            <p className="text-sm text-muted-foreground">
-                              As imagens representam a peça real cadastrada. Descrição e
-                              notas foram registradas pelo proprietário da coleção.
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Cadastro em: {formatDateTime(c.created_at)} • Atualizado em:{" "}
-                              {formatDateTime(c.updated_at)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-          
-                    {/* Detalhes */}
-                    <div className="space-y-8">
-                      <div>
-                        <div className="mb-4 flex flex-wrap items-center gap-3">
-                          <Badge
-                            className={`border-0 text-sm ${originalityBadgeClasses(
-                              c.originality
-                            )}`}
-                          >
-                            {originalityLabel(c.originality)}
-                          </Badge>
-          
-                          {c.condition ? (
-                            <Badge variant="secondary" className="text-sm">
-                              {c.condition}
-                            </Badge>
-                          ) : null}
-          
-                          {c.category ? (
-                            <Badge variant="secondary" className="text-sm">
-                              {c.category}
-                            </Badge>
-                          ) : null}
-          
-                          {/* Badge de disponibilidade no header */}
-                          <Badge variant="secondary" className="text-sm">
-                            {Number.isFinite(quantity) && quantity > 0
-                              ? `${quantity} disponível`
-                              : "Indisponível"}
-                          </Badge>
-                        </div>
-          
-                        <h1 className="font-display text-4xl font-bold text-foreground lg:text-5xl">
-                          {c.title}
-                        </h1>
-          
-                        <p className="mt-2 text-xl text-muted-foreground">
-                          {c.country ?? "—"} {c.face_value ?? "—"} {c.year ? `• ${c.year}` : ""}
-                        </p>
-                      </div>
-          
-                      {/* Cards principais para compra */}
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="rounded-xl border border-border bg-card p-5">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/10">
-                              <Calendar className="h-5 w-5 text-gold" />
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Ano</p>
-                              <p className="font-display text-xl font-semibold">
-                                {c.year ?? "—"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-          
-                        <div className="rounded-xl border border-border bg-card p-5">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/10">
-                              <MapPin className="h-5 w-5 text-gold" />
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">País</p>
-                              <p className="font-display text-xl font-semibold">
-                                {c.country ?? "—"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-          
-                        {/* NOVO: disponibilidade como card */}
-                        <div className="rounded-xl border border-border bg-card p-5">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/10">
-                              <Boxes className="h-5 w-5 text-gold" />
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">
-                                Quantidade disponível
-                              </p>
-                              <p className="font-display text-xl font-semibold">
-                                {Number.isFinite(quantity) && quantity > 0
-                                  ? quantity
-                                  : "0"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-          
-                        <div className="rounded-xl border border-gold bg-gold/5 p-5">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/20">
-                              <CircleDollarSign className="h-5 w-5 text-gold" />
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">
-                                Valor estimado
-                              </p>
-                              <p className="font-display text-2xl font-bold text-gold">
-                                {formatBRL(Number(c.estimated_value ?? 0))}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                (Estimativa informativa; preço de venda pode variar)
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-          
-                      {/* Ficha técnica */}
-                      <div className="rounded-xl border border-border bg-card p-6">
-                        <div className="mb-4 flex items-center gap-2">
-                          <Info className="h-5 w-5 text-gold" />
-                          <h2 className="font-display text-xl font-semibold">
-                            Ficha técnica
-                          </h2>
-                        </div>
-          
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="flex items-start gap-3">
-                            <Tag className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">Categoria</p>
-                              <p className="font-medium">{c.category ?? "—"}</p>
-                            </div>
-                          </div>
-          
-                          <div className="flex items-start gap-3">
-                            <HandCoins className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">
-                                Originalidade
-                              </p>
-                              <p className="font-medium">
-                                {originalityLabel(c.originality)}
-                              </p>
-                            </div>
-                          </div>
-          
-                          {/* NOVO: quantidade na ficha técnica */}
-                          <div className="flex items-start gap-3">
-                            <Boxes className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">
-                                Quantidade disponível
-                              </p>
-                              <p className="font-medium">
-                                {Number.isFinite(quantity) && quantity > 0
-                                  ? quantity
-                                  : "0"}
-                              </p>
-                            </div>
-                          </div>
-          
-                          <div className="flex items-start gap-3">
-                            <Archive className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">
-                                Local de armazenamento
-                              </p>
-                              <p className="font-medium">{c.storage_location ?? "—"}</p>
-                            </div>
-                          </div>
-          
-                          <div className="flex items-start gap-3">
-                            <Calendar className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">Aquisição</p>
-                              <p className="font-medium">{c.acquisition_source ?? "—"}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatDateTime(c.acquisition_date)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-          
-                      {c.notes ? (
-                        <div className="rounded-xl border border-border bg-card p-6">
-                          <h2 className="mb-3 font-display text-xl font-semibold">
-                            Observações do proprietário
-                          </h2>
-                          <p className="leading-relaxed text-muted-foreground">
-                            {c.notes}
-                          </p>
-                        </div>
-                      ) : null}
-          
-                      <div className="rounded-xl border border-border bg-card p-6">
-                        <h2 className="mb-2 font-display text-xl font-semibold">
-                          Interessado em comprar?
-                        </h2>
-                        <p className="mb-4 text-sm text-muted-foreground">
-                          Para negociar, você pode entrar em contato com o vendedor e
-                          solicitar mais fotos, vídeo ou detalhes sobre a peça.
-                        </p>
-          
-                        <div className="flex flex-col gap-3 sm:flex-row">
-                          <Button variant="gold" className="w-full sm:w-auto">
-                            Tenho interesse
-                          </Button>
-                          <Button variant="outline" className="w-full sm:w-auto">
-                            Solicitar mais detalhes
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </main>
-              </div>  )
+                {links.whatsapp && (
+                  <a
+                    href={links.whatsapp}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-[52px] items-center justify-center gap-2 rounded-[14px] bg-accent text-[15px] font-semibold text-accent-foreground hover:bg-accent/90"
+                  >
+                    <MessageCircle className="h-[18px] w-[18px]" aria-hidden="true" />
+                    Negociar pelo WhatsApp
+                  </a>
+                )}
+                {links.email && (
+                  <a
+                    href={links.email}
+                    className="flex h-[46px] items-center justify-center gap-2 rounded-[14px] border border-border text-sm hover:bg-secondary"
+                  >
+                    <Mail className="h-4 w-4" aria-hidden="true" />
+                    Enviar e-mail
+                  </a>
+                )}
+              </div>
+            )}
+          </aside>
+        </div>
+      </main>
+
+      <Dialog open={zoom} onOpenChange={setZoom}>
+        <DialogContent className="flex max-h-[95vh] w-auto max-w-[95vw] items-center justify-center border-0 bg-transparent p-2 shadow-none sm:rounded-none">
+          <DialogTitle className="sr-only">{alt}</DialogTitle>
+          {showImage && (
+            <img src={url} alt={alt} className="max-h-[90vh] max-w-[90vw] object-contain" />
+          )}
+        </DialogContent>
+      </Dialog>
+    </Shell>
+  )
 }
