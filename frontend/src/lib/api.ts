@@ -112,15 +112,15 @@ export interface CoinCreate {
   year: number
   country: string
   face_value: string
-  purchase_price?: number
-  estimated_value?: number
+  purchase_price?: number | null
+  estimated_value?: number | null
   originality: string
-  condition?: string
-  storage_location?: string
-  category?: string
-  acquisition_date?: string
-  acquisition_source?: string
-  notes?: string
+  condition?: string | null
+  storage_location?: string | null
+  category?: string | null
+  acquisition_date?: string | null
+  acquisition_source?: string | null
+  notes?: string | null
   for_sale?: boolean
   sale_price?: number | null
   public_description?: string | null
