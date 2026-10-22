@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss"
+import tailwindcssAnimate from "tailwindcss-animate"
 
 export default {
   darkMode: ["class"],
@@ -19,16 +20,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: [
-          "Inter",
-          "system-ui",
-          "-apple-system",
-          "Segoe UI",
-          "Roboto",
-          "Helvetica",
-          "Arial",
-          "sans-serif",
-        ],
+        display: ["Fraunces", "Georgia", "Times New Roman", "serif"],
         body: [
           "Inter",
           "system-ui",
@@ -78,6 +70,7 @@ export default {
           DEFAULT: "hsl(var(--gold))",
           light: "hsl(var(--gold-light))",
           dark: "hsl(var(--gold-dark))",
+          text: "hsl(var(--gold-text))",
         },
         charcoal: {
           DEFAULT: "hsl(var(--charcoal))",
@@ -119,5 +112,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config

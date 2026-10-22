@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,58 +6,60 @@
 
 @layer base {
   :root {
-    --background: 45 30% 97%;
-    --foreground: 220 20% 15%;
+    --background: 44 41% 95%;
+    --foreground: 222 22% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 15%;
+    --card-foreground: 222 22% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 15%;
+    --popover-foreground: 222 22% 15%;
 
-    --primary: 220 20% 18%;
-    --primary-foreground: 45 30% 97%;
+    --primary: 222 22% 15%;
+    --primary-foreground: 44 41% 95%;
 
-    --secondary: 45 40% 92%;
-    --secondary-foreground: 220 20% 15%;
+    --secondary: 45 42% 91%;
+    --secondary-foreground: 222 22% 15%;
 
-    --muted: 45 20% 90%;
-    --muted-foreground: 220 10% 45%;
+    --muted: 44 37% 90%;
+    --muted-foreground: 222 10% 41%;
 
-    --accent: 42 85% 55%;
-    --accent-foreground: 220 20% 12%;
+    --accent: 46 68% 47%;
+    --accent-foreground: 222 22% 15%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 45 20% 85%;
-    --input: 45 20% 85%;
-    --ring: 42 85% 55%;
+    --border: 44 31% 86%;
+    --input: 44 31% 86%;
+    --ring: 46 68% 47%;
 
-    --radius: 0.5rem;
+    --radius: 1rem;
 
-    /* Custom colors */
-    --gold: 42 85% 55%;
-    --gold-light: 42 70% 75%;
-    --gold-dark: 42 80% 40%;
-    --charcoal: 220 20% 18%;
-    --charcoal-light: 220 15% 30%;
-    --cream: 45 30% 97%;
-    --cream-dark: 45 25% 92%;
+    /* Custom colors (gold is fill-only; use gold-text for text) */
+    --gold: 46 68% 47%;
+    --gold-light: 48 77% 82%;
+    --gold-dark: 45 72% 38%;
+    --gold-text: 43 79% 27%;
+    --success: 141 50% 24%;
+    --success-bg: 138 32% 92%;
+    --charcoal: 222 22% 15%;
+    --charcoal-light: 222 12% 28%;
+    --cream: 44 41% 95%;
+    --cream-dark: 44 37% 90%;
 
-    /* Sidebar */
-    --sidebar-background: 220 20% 18%;
-    --sidebar-foreground: 45 30% 97%;
-    --sidebar-primary: 42 85% 55%;
-    --sidebar-primary-foreground: 220 20% 12%;
-    --sidebar-accent: 220 15% 25%;
-    --sidebar-accent-foreground: 45 30% 97%;
-    --sidebar-border: 220 15% 28%;
-    --sidebar-ring: 42 85% 55%;
+    /* Sidebar (light) */
+    --sidebar-background: 44 41% 95%;
+    --sidebar-foreground: 222 22% 15%;
+    --sidebar-primary: 222 22% 15%;
+    --sidebar-primary-foreground: 44 41% 95%;
+    --sidebar-accent: 44 37% 90%;
+    --sidebar-accent-foreground: 222 22% 15%;
+    --sidebar-border: 44 31% 86%;
+    --sidebar-ring: 46 68% 47%;
 
     /* Typography */
-    --font-display: "Inter", system-ui, -apple-system, Segoe UI, Roboto,
-      Helvetica, Arial, sans-serif;
+    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
     --font-body: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
       Arial, sans-serif;
   }
@@ -144,6 +146,10 @@
     );
   }
 
+  .coin-stage {
+    background: radial-gradient(#ffffff, #efeadc);
+  }
+
   .gradient-charcoal {
     background: linear-gradient(
       180deg,
@@ -153,7 +159,7 @@
   }
 
   .shadow-elegant {
-    box-shadow: 0 4px 20px -4px hsl(var(--charcoal) / 0.15);
+    box-shadow: 0 1px 2px rgba(31, 36, 48, 0.05);
   }
 
   .shadow-gold {
