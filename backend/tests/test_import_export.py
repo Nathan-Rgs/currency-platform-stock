@@ -93,3 +93,31 @@ def test_import_br_dates(client, auth_headers):
     assert r["inserted"] == 3 and [e["row"] for e in r["errors"]] == [4]
     data = client.get("/api/v1/coins", headers=auth_headers).json()["data"]
     assert all(c["acquisition_date"].startswith("2024-12-18") for c in data)
+
+
+def test_json_import_ignores_image_and_id_keys(client, auth_headers):
+    row = {"title": "a", "year": 1994, "country": "BR", "face_value": "1",
+           "id": 99, "owner_id": 7, "image_url_front": "x.png"}
+    r = _post(client, auth_headers, "c.json", json.dumps([row]).encode(), "application/json")
+    assert r.json() == {"inserted": 1, "errors": []}
+    got = client.get("/api/v1/coins", headers=auth_headers).json()["data"][0]
+    assert got["image_url_front"] is None and got["id"] != 99
+
+
+def test_csv_header_case_insensitive(client, auth_headers):
+    csv = b"Title;YEAR;Country;Face_Value\nx;1994;BR;1\n"
+    assert _post(client, auth_headers, "c.csv", csv).json() == {"inserted": 1, "errors": []}
+
+
+def test_csv_blank_rows_skipped_numbering_kept(client, auth_headers):
+    csv = b"title;year;country;face_value\nx;1994;BR;1\n;;;\n;;;\n"
+    assert _post(client, auth_headers, "c.csv", csv).json() == {"inserted": 1, "errors": []}
+    csv = b"title;year;country;face_value\n;;;\nbad;abc;BR;1\n"
+    assert _post(client, auth_headers, "c.csv", csv).json()["errors"][0]["row"] == 2
+
+
+def test_csv_blank_quantity_defaults_to_1(client, auth_headers):
+    csv = b"title;year;country;face_value;quantity;originality\nx;1994;BR;1;;\n"
+    assert _post(client, auth_headers, "c.csv", csv).json()["inserted"] == 1
+    got = client.get("/api/v1/coins", headers=auth_headers).json()["data"][0]
+    assert got["quantity"] == 1

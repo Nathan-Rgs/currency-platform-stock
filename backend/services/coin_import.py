@@ -43,14 +43,15 @@ def parse_csv(text: str) -> list[dict]:
 
 
 def normalize_row(row: dict) -> dict:
+    """CSV cells: trim, empty -> dropped (model defaults apply), decimal comma, BR dates."""
     out = {}
     for key, value in row.items():
-        key = (key or "").strip()
-        if not key or key in IGNORED:
-            continue
+        key = (key or "").strip().lower()
         if isinstance(value, str):
             value = value.strip() or None
-        if value is not None and key in FLOAT_FIELDS | INT_FIELDS and isinstance(value, str):
+        if not key or value is None:
+            continue
+        if key in FLOAT_FIELDS | INT_FIELDS and isinstance(value, str):
             value = value.replace(",", ".")
         if key == "acquisition_date" and isinstance(value, str):
             value = parse_br_date(value)
@@ -72,7 +73,12 @@ def build_coins(rows: list[dict], normalize: bool) -> tuple[list[CoinCreate], li
         try:
             if not isinstance(row, dict):
                 raise ValueError("Linha inválida.")
-            coins.append(CoinCreate(**(normalize_row(row) if normalize else row)))
+            if normalize:
+                row = normalize_row(row)
+                if not row:  # blank spreadsheet row (e.g. trailing ";;;")
+                    continue
+            row = {k: v for k, v in row.items() if k not in IGNORED}
+            coins.append(CoinCreate(**row))
         except (ValidationError, ValueError, TypeError) as exc:
             errors.append({"row": n, "message": row_message(exc)})
     return coins, errors
