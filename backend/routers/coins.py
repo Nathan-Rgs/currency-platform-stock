@@ -1,6 +1,7 @@
 import csv
 import io
-from datetime import datetime
+import json
+from datetime import date
 from typing import List, Optional
 
 from fastapi import (
@@ -12,7 +13,7 @@ from fastapi import (
     UploadFile,
     File,
 )
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,7 @@ from core.storage import delete_media, save_image
 from models.coin import Coin, OriginalityEnum
 from models.user import User
 from schemas.coin import CoinCreate, CoinRead, CoinUpdate
+from services.coin_import import ImportFileError, TEMPLATE_COLUMNS, build_coins, decode, parse_csv
 from schemas.common import PaginatedResponse
 from repositories.coin_repo import CoinSort, apply_coin_filters, paginate_coins
 
@@ -238,6 +240,11 @@ def upload_coin_image(
     return coin
 
 
+@router.get("/import/template")
+def import_template(current_user: User = Depends(get_current_active_user)):
+    return _csv_response(TEMPLATE_COLUMNS, [], "modelo-importacao.csv")
+
+
 @router.post("/import")
 def import_from_file(
     file: UploadFile,
@@ -245,43 +252,27 @@ def import_from_file(
     current_user: User = Depends(get_current_active_user),
     audit_service: AuditService = Depends(get_audit_service),
 ):
-    content = file.file.read()
-    inserted, errors = 0, 0
-    coins_to_add = []
-
+    name = (file.filename or "").lower()
+    if not name.endswith((".json", ".csv")):
+        raise HTTPException(400, "Invalid file format. Use .json or .csv.")
     try:
-        if file.filename.endswith(".json"):
-            import json
-            data = json.loads(content)
-            for item in data:
-                try:
-                    coin_in = CoinCreate(**item)
-                    coins_to_add.append(Coin(**coin_in.model_dump(), owner_id=current_user.id))
-                except Exception:
-                    errors += 1
-        elif file.filename.endswith(".csv"):
-            reader = csv.DictReader(io.StringIO(content.decode("utf-8")))
-            for row in reader:
-                try:
-                    # Implement robust type conversion for CSV data
-                    if p := row.get("purchase_price"): row["purchase_price"] = float(p)
-                    if e := row.get("estimated_value"): row["estimated_value"] = float(e)
-                    if y := row.get("year"): row["year"] = int(y)
-                    if d := row.get("acquisition_date"): row["acquisition_date"] = datetime.fromisoformat(d)
-                    
-                    coin_in = CoinCreate(**row)
-                    coins_to_add.append(Coin(**coin_in.model_dump(), owner_id=current_user.id))
-                except (ValueError, TypeError):
-                    errors += 1
+        text = decode(file.file.read())
+        if name.endswith(".json"):
+            rows, normalize = json.loads(text), False
+            if not isinstance(rows, list):
+                raise ImportFileError("JSON deve ser uma lista de moedas.")
         else:
-            raise HTTPException(400, "Invalid file format. Use .json or .csv.")
+            rows, normalize = parse_csv(text), True
+    except (ImportFileError, ValueError, csv.Error) as exc:
+        raise HTTPException(400, f"Não foi possível ler o arquivo: {exc}")
 
-        if coins_to_add:
-            db.add_all(coins_to_add)
+    coins_in, errors = build_coins(rows, normalize)
+    coins = [Coin(**c.model_dump(), owner_id=current_user.id) for c in coins_in]
+    try:
+        if coins:
+            db.add_all(coins)
             db.commit()
-            inserted = len(coins_to_add)
-
-            for coin in coins_to_add:
+            for coin in coins:
                 db.refresh(coin)
                 audit_log = CoinAuditLogCreate(
                     action=AuditLogAction.IMPORT,
@@ -290,12 +281,23 @@ def import_from_file(
                     delta_quantity=coin.quantity,
                 )
                 audit_service.create_audit_log(actor=current_user, audit_log_in=audit_log)
-
     except Exception as e:
         db.rollback()
         raise HTTPException(500, f"Import failed: {e}")
 
-    return {"inserted": inserted, "errors": errors}
+    return {"inserted": len(coins), "errors": errors}
+
+
+def _csv_response(columns, rows, filename: str) -> Response:
+    out = io.StringIO()
+    writer = csv.DictWriter(out, fieldnames=columns, delimiter=";", extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+    return Response(
+        out.getvalue().encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/export/all")
@@ -307,21 +309,11 @@ def export_to_file(
     query = select(Coin).where(Coin.owner_id == current_user.id)
     coins = db.execute(query).scalars().all()
     data = [CoinRead.model_validate(c).model_dump(mode="json") for c in coins]
+    stamp = date.today().isoformat()
 
     if format == "json":
-        return JSONResponse(content=data)
-
-    if not data:
-        return StreamingResponse(iter([""]), media_type="text/csv")
-
-    output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=data[0].keys())
-    writer.writeheader()
-    writer.writerows(data)
-    output.seek(0)
-    
-    return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": 'attachment; filename="coins.csv"'},
-    )
+        return JSONResponse(
+            content=data,
+            headers={"Content-Disposition": f'attachment; filename="colecao-{stamp}.json"'},
+        )
+    return _csv_response(list(CoinRead.model_fields), data, f"colecao-{stamp}.csv")
