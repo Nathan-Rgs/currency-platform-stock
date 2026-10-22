@@ -1,7 +1,5 @@
 import csv
 import io
-import os
-import uuid
 from datetime import datetime
 from typing import List, Optional
 
@@ -20,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from core.database import get_db
 from core.security import get_current_active_user
+from core.storage import delete_media, save_image
 from models.coin import Coin, OriginalityEnum
 from models.user import User
 from schemas.coin import CoinCreate, CoinRead, CoinUpdate
@@ -193,8 +192,11 @@ def delete_coin(
     )
     audit_service.create_audit_log(actor=current_user, audit_log_in=audit_log)
 
+    front, back = coin.image_url_front, coin.image_url_back
     db.delete(coin)
     db.commit()
+    delete_media(front, MEDIA_DIR)
+    delete_media(back, MEDIA_DIR)
     return
 
 
@@ -211,20 +213,26 @@ def upload_coin_image(
 
     coin = get_coin_or_404(db, coin_id, current_user.id)
 
-    def save_file(file: UploadFile) -> str:
-        os.makedirs(MEDIA_DIR, exist_ok=True)
-        ext = os.path.splitext(file.filename)[-1]
-        filename = f"{uuid.uuid4().hex}{ext}"
-        path = os.path.join(MEDIA_DIR, filename)
-        with open(path, "wb") as f:
-            f.write(file.file.read())
-        return path.replace(os.sep, '/')
+    old = {"front": coin.image_url_front, "back": coin.image_url_back}
+    saved = []
+    try:
+        if front_image:
+            coin.image_url_front = save_image(front_image, MEDIA_DIR)
+            saved.append(coin.image_url_front)
+        if back_image:
+            coin.image_url_back = save_image(back_image, MEDIA_DIR)
+            saved.append(coin.image_url_back)
+        db.commit()
+    except BaseException:
+        db.rollback()
+        for url in saved:
+            delete_media(url, MEDIA_DIR)
+        raise
 
     if front_image:
-        coin.image_url_front = save_file(front_image)
+        delete_media(old["front"], MEDIA_DIR)
     if back_image:
-        coin.image_url_back = save_file(back_image)
-
+        delete_media(old["back"], MEDIA_DIR)
     db.commit()
     db.refresh(coin)
     return coin
