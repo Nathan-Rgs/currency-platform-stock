@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AdminMobileBar, AdminSidebar } from './AdminSidebar';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 
 export function AdminLayout() {
   const { isAuthenticated, isLoading, checkAuth } = useAuth();
@@ -28,7 +28,19 @@ export function AdminLayout() {
       <AdminSidebar />
       <AdminMobileBar />
       <main className="min-h-screen p-4 lg:ml-64 lg:p-8">
-        <Outlet />
+        <Suspense
+          fallback={
+            <div className="flex justify-center py-20">
+              <div
+                role="status"
+                aria-label="Carregando"
+                className="h-8 w-8 animate-spin rounded-full border-4 border-gold border-t-transparent"
+              />
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );
