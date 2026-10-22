@@ -35,8 +35,8 @@ export const getChanges = (
 
   const changes: FieldChange[] = []
   for (const key of keys) {
-    const b = (before as any)?.[key]
-    const a = (after as any)?.[key]
+    const b = before[key]
+    const a = after[key]
     if (stableStringify(b) !== stableStringify(a)) {
       changes.push({ field: key, before: b, after: a })
     }
@@ -60,25 +60,25 @@ export const formatValue = (v: JsonValue | undefined) => {
 
 export const fieldLabel = (field: string) => {
   const map: Record<string, string> = {
-    quantity: "Quantity",
-    year: "Year",
-    country: "Country",
-    face_value: "Face value",
-    purchase_price: "Purchase price",
-    estimated_value: "Estimated value",
-    originality: "Originality",
-    condition: "Condition",
-    storage_location: "Storage location",
-    category: "Category",
-    acquisition_date: "Acquisition date",
-    acquisition_source: "Acquisition source",
-    notes: "Notes",
-    image_url_front: "Front image",
-    image_url_back: "Back image",
-    owner_id: "Owner",
-    id: "Coin ID",
-    created_at: "Created at",
-    updated_at: "Updated at",
+    quantity: "Quantidade",
+    year: "Ano",
+    country: "País",
+    face_value: "Valor de face",
+    purchase_price: "Preço de compra",
+    estimated_value: "Valor estimado",
+    originality: "Originalidade",
+    condition: "Conservação",
+    storage_location: "Local de guarda",
+    category: "Categoria",
+    acquisition_date: "Data de aquisição",
+    acquisition_source: "Origem da aquisição",
+    notes: "Observações",
+    image_url_front: "Imagem (frente)",
+    image_url_back: "Imagem (verso)",
+    owner_id: "Proprietário",
+    id: "ID da moeda",
+    created_at: "Criado em",
+    updated_at: "Atualizado em",
   }
 
   return map[field] ?? field

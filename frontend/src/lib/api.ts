@@ -1,4 +1,4 @@
-import axios from "axios"
+import axios, { isAxiosError } from "axios"
 
 export const API_URL: string =
   import.meta.env.VITE_API_URL ?? "http://localhost:8000"
@@ -22,10 +22,35 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem("access_token")
+      const { pathname, search } = window.location
+      if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+        window.location.assign(
+          `/admin/login?next=${encodeURIComponent(pathname + search)}`,
+        )
+      }
     }
     return Promise.reject(error)
   },
 )
+
+/** Unified, user-facing message (pt-BR) for any request error. */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  if (!isAxiosError(err)) return fallback
+  if (!err.response) return "Servidor indisponível. Verifique a conexão."
+  const { status, data } = err.response
+  if (status === 401) return "Sessão expirada. Entre novamente."
+  if ([400, 413, 415, 422].includes(status)) {
+    const detail = (data as { detail?: unknown } | undefined)?.detail
+    if (typeof detail === "string" && detail) return detail
+    if (Array.isArray(detail)) {
+      const msgs = detail
+        .map((d) => (d as { msg?: unknown })?.msg)
+        .filter((m): m is string => typeof m === "string" && !!m)
+      if (msgs.length) return msgs.join("; ")
+    }
+  }
+  return fallback
+}
 
 // Types
 export interface CoinPublic {

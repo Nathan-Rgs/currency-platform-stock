@@ -1,4 +1,5 @@
 import axios from "axios"
+import { apiErrorMessage } from "@/lib/api"
 
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -11,24 +12,15 @@ export function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-// ponytail: Task 17 replaces this with the shared apiErrorMessage helper.
-// Handles blob responses (export/template) whose error body is JSON.
+// Blob responses (export/template) carry JSON error bodies: parse them, then
+// delegate to the shared formatter.
 export async function requestErrorDetail(e: unknown): Promise<string> {
-  if (axios.isAxiosError(e)) {
-    let data = e.response?.data
-    if (data instanceof Blob) {
-      try {
-        data = JSON.parse(await data.text())
-      } catch {
-        data = undefined
-      }
-    }
-    const detail = data?.detail
-    if (typeof detail === "string") return detail
-    if (Array.isArray(detail)) {
-      const msgs = detail.map((d) => d?.msg).filter(Boolean)
-      if (msgs.length) return msgs.join("; ")
+  if (axios.isAxiosError(e) && e.response?.data instanceof Blob) {
+    try {
+      e.response.data = JSON.parse(await e.response.data.text())
+    } catch {
+      e.response.data = undefined
     }
   }
-  return "Falha de conexão. Tente novamente."
+  return apiErrorMessage(e, "Não foi possível concluir a operação.")
 }

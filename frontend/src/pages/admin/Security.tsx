@@ -1,12 +1,5 @@
 import { Button } from "@/components/ui/button"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -18,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
-import { authApi } from "@/lib/api"
+import { apiErrorMessage, authApi } from "@/lib/api"
 import { Loader2, ShieldCheck, ShieldOff } from "lucide-react"
 import QRCode from "qrcode.react"
 import { useEffect, useState } from "react"
@@ -40,6 +33,7 @@ export default function SecurityPage() {
       } catch (error) {
         toast({
           title: "Erro ao buscar status do MFA",
+          description: apiErrorMessage(error, "Tente novamente."),
           variant: "destructive",
         })
       }
@@ -53,19 +47,11 @@ export default function SecurityPage() {
       const response = await authApi.setupMfa()
       setSetupUri(response.provisioning_uri)
       setShowSetupDialog(true)
-    } catch (error: any) {
-      let description =
-        error?.response?.data?.detail || "Ocorreu um erro ao configurar o MFA."
-      // Erro de conflito, por exemplo, MFA já habilitado
-      if (error?.response?.status === 409) {
-        description =
-          error?.response?.data?.detail ||
-          "A autenticação de múltiplos fatores já está habilitada para esta conta."
-      } else if (error?.request && !error?.response) {
-        // Erro de rede/sem resposta do servidor
-        description =
-          "Não foi possível se conectar ao servidor. Verifique sua conexão com a internet e tente novamente."
-      }
+    } catch (error) {
+      const description = apiErrorMessage(
+        error,
+        "Ocorreu um erro ao configurar o MFA.",
+      )
       toast({
         title: "Erro ao configurar MFA",
         description,
@@ -96,11 +82,10 @@ export default function SecurityPage() {
       setShowSetupDialog(false)
       setSetupUri(null)
       setVerifyCode("")
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Erro na verificação",
-        description:
-          error.response?.data?.detail || "Código inválido ou expirado.",
+        description: apiErrorMessage(error, "Código inválido ou expirado."),
         variant: "destructive",
       })
     } finally {
@@ -127,11 +112,10 @@ export default function SecurityPage() {
       setIsMfaEnabled(false)
       setShowDisableDialog(false)
       setVerifyCode("")
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Erro ao desativar",
-        description:
-          error.response?.data?.detail || "Código inválido ou erro inesperado.",
+        description: apiErrorMessage(error, "Código inválido ou erro inesperado."),
         variant: "destructive",
       })
     } finally {
@@ -146,7 +130,7 @@ export default function SecurityPage() {
     if (isMfaEnabled) {
       return (
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-green-600">
+          <div className="flex items-center gap-2 text-success">
             <ShieldCheck className="h-5 w-5" />
             <span className="text-sm font-medium">MFA está ATIVO</span>
           </div>
@@ -166,7 +150,7 @@ export default function SecurityPage() {
     }
     return (
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 text-red-600">
+        <div className="flex items-center gap-2 text-destructive">
           <ShieldOff className="h-5 w-5" />
           <span className="text-sm font-medium">MFA está DESATIVADO</span>
         </div>
@@ -183,19 +167,23 @@ export default function SecurityPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <h1 className="text-2xl font-bold mb-6">Segurança da Conta</h1>
+      <h1 className="mb-6 font-display text-2xl font-semibold text-foreground">
+        Segurança da conta
+      </h1>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Autenticação de Múltiplos Fatores (MFA)</CardTitle>
-          <CardDescription>
+      <section className="max-w-2xl space-y-4 rounded-2xl bg-card p-6 shadow-elegant">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold text-foreground">
+            Autenticação de múltiplos fatores (MFA)
+          </h2>
+          <p className="text-sm text-muted-foreground">
             Adicione uma camada extra de segurança à sua conta. Uma vez ativado,
             você precisará fornecer um código do seu aplicativo autenticador ao
             fazer login.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>{renderStatus()}</CardContent>
-      </Card>
+          </p>
+        </div>
+        {renderStatus()}
+      </section>
 
       {/* Setup Dialog */}
       <Dialog open={showSetupDialog} onOpenChange={setShowSetupDialog}>
@@ -217,6 +205,7 @@ export default function SecurityPage() {
             <Label htmlFor="verify-code">Código de Verificação</Label>
             <Input
               id="verify-code"
+              className="h-[46px] rounded-xl text-base"
               placeholder="123456"
               value={verifyCode}
               onChange={(e) => setVerifyCode(e.target.value)}
@@ -255,6 +244,8 @@ export default function SecurityPage() {
             <Label htmlFor="disable-code">Código de Verificação Atual</Label>
             <Input
               id="disable-code"
+              className="h-[46px] rounded-xl text-base"
+              inputMode="numeric"
               placeholder="123456"
               value={verifyCode}
               onChange={(e) => setVerifyCode(e.target.value)}

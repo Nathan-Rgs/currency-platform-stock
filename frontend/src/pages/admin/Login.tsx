@@ -3,10 +3,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
-import { authApi } from "@/lib/api"
-import { Coins, Eye, EyeOff, Loader2 } from "lucide-react"
+import { authApi, apiErrorMessage } from "@/lib/api"
+import { BRAND_NAME } from "@/lib/brand"
+import axios from "axios"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { useState, useEffect } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("")
@@ -17,13 +19,23 @@ export default function AdminLogin() {
   const [isWaitingForMfa, setIsWaitingForMfa] = useState(false)
   const { login, finishMfaLogin, isAuthenticated, isLoading } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { toast } = useToast()
+  // Only same-app admin paths (no "//host" tricks) to prevent open redirects.
+  const next = searchParams.get("next")
+  const destination =
+    next && /^\/admin(\/|$|\?)/.test(next) ? next : "/admin/dashboard"
+  // 401 here means bad credentials, not an expired session.
+  const authError = (err: unknown, fallback: string) =>
+    axios.isAxiosError(err) && err.response?.status === 401
+      ? fallback
+      : apiErrorMessage(err, fallback)
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      navigate("/admin/dashboard", { replace: true })
+      navigate(destination, { replace: true })
     }
-  }, [isAuthenticated, isLoading, navigate])
+  }, [isAuthenticated, isLoading, navigate, destination])
 
   const handlePrimaryLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,12 +57,12 @@ export default function AdminLogin() {
           title: "Bem-vindo!",
           description: "Login realizado com sucesso.",
         })
-        navigate("/admin/dashboard")
+        navigate(destination)
       }
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Erro de autenticação",
-        description: err.response?.data?.detail || "Email ou senha inválidos.",
+        description: authError(err, "Email ou senha inválidos."),
         variant: "destructive",
       })
     } finally {
@@ -76,11 +88,11 @@ export default function AdminLogin() {
         title: "Bem-vindo!",
         description: "Login realizado com sucesso.",
       })
-      navigate("/admin/dashboard")
-    } catch (err: any) {
+      navigate(destination)
+    } catch (err) {
       toast({
         title: "Erro de autenticação",
-        description: err.response?.data?.detail || "Código MFA inválido.",
+        description: authError(err, "Código MFA inválido."),
         variant: "destructive",
       })
     } finally {
@@ -89,28 +101,29 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-primary px-4">
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-
-      <div className="relative w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
+      <div className="w-full max-w-md">
+        {/* Marca */}
+        <div className="mb-8 text-center">
           <Link to="/" className="inline-flex items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gold/20">
-              <Coins className="h-7 w-7 text-gold" />
-            </div>
-            <span className="font-display text-3xl font-bold text-primary-foreground">
-              Numis<span className="text-gold">Admin</span>
+            <span
+              aria-hidden="true"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-accent font-display text-xl font-semibold text-accent-foreground"
+            >
+              {BRAND_NAME[0]}
+            </span>
+            <span className="font-display text-2xl font-semibold text-foreground">
+              {BRAND_NAME}
             </span>
           </Link>
         </div>
 
         {/* Login Card */}
-        <div className="rounded-2xl border border-border/10 bg-card p-8 shadow-elegant animate-scaleIn">
+        <div className="rounded-2xl bg-card p-6 shadow-elegant sm:p-8">
           {!isWaitingForMfa ? (
             <>
               <div className="text-center mb-8">
-                <h1 className="font-display text-2xl font-bold text-foreground">
+                <h1 className="font-display text-2xl font-semibold text-foreground">
                   Acesso Administrativo
                 </h1>
                 <p className="mt-2 text-muted-foreground">
@@ -119,7 +132,7 @@ export default function AdminLogin() {
               </div>
               <form onSubmit={handlePrimaryLogin} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email" className="text-xs font-normal text-muted-foreground">Email</Label>
                   <Input
                     id="email"
                     type="email"
@@ -127,11 +140,11 @@ export default function AdminLogin() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={loading}
-                    className="h-12"
+                    className="h-[46px] rounded-xl text-base"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Senha</Label>
+                  <Label htmlFor="password" className="text-xs font-normal text-muted-foreground">Senha</Label>
                   <div className="relative">
                     <Input
                       id="password"
@@ -140,12 +153,13 @@ export default function AdminLogin() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       disabled={loading}
-                      className="h-12 pr-12"
+                      className="h-[46px] rounded-xl pr-12 text-base"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                      className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
                     >
                       {showPassword ? (
                         <EyeOff className="h-5 w-5" />
@@ -157,7 +171,7 @@ export default function AdminLogin() {
                 </div>
                 <Button
                   type="submit"
-                  variant="gold"
+                  variant="accent"
                   size="xl"
                   className="w-full"
                   disabled={loading}
@@ -175,7 +189,7 @@ export default function AdminLogin() {
           ) : (
             <>
               <div className="text-center mb-8">
-                <h1 className="font-display text-2xl font-bold text-foreground">
+                <h1 className="font-display text-2xl font-semibold text-foreground">
                   Verificação de Dois Fatores
                 </h1>
                 <p className="mt-2 text-muted-foreground">
@@ -184,7 +198,7 @@ export default function AdminLogin() {
               </div>
               <form onSubmit={handleMfaLogin} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="totp-code">Código de Verificação</Label>
+                  <Label htmlFor="totp-code" className="text-xs font-normal text-muted-foreground">Código de Verificação</Label>
                   <Input
                     id="totp-code"
                     type="text"
@@ -192,7 +206,7 @@ export default function AdminLogin() {
                     value={totpCode}
                     onChange={(e) => setTotpCode(e.target.value)}
                     disabled={loading}
-                    className="h-12 text-center tracking-widest text-lg"
+                    className="h-[46px] rounded-xl text-center text-lg tracking-widest"
                     maxLength={6}
                     inputMode="numeric"
                     pattern="[0-9]*"
@@ -200,7 +214,7 @@ export default function AdminLogin() {
                 </div>
                 <Button
                   type="submit"
-                  variant="gold"
+                  variant="accent"
                   size="xl"
                   className="w-full"
                   disabled={loading}
@@ -221,7 +235,7 @@ export default function AdminLogin() {
           <div className="mt-6 text-center">
             <Link
               to="/"
-              className="text-sm text-muted-foreground hover:text-gold transition-colors"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               ← Voltar ao mostruário
             </Link>

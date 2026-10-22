@@ -25,6 +25,7 @@ import {
   emptyCoinFormValues,
   toCoinPayload,
 } from "@/lib/coin-schema"
+import { apiErrorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { zodResolver } from "@hookform/resolvers/zod"
 import axios from "axios"
@@ -33,16 +34,8 @@ import { useEffect, useRef, useState } from "react"
 import { useForm, useFormContext } from "react-hook-form"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 
-// ponytail: local API error formatter; Task 17 replaces it with the shared apiErrorMessage helper.
-function apiErrorDetail(e: unknown): string {
-  const detail = axios.isAxiosError(e) ? e.response?.data?.detail : undefined
-  if (typeof detail === "string") return detail
-  if (Array.isArray(detail)) {
-    const msgs = detail.map((d) => d?.msg).filter(Boolean)
-    if (msgs.length) return msgs.join("; ")
-  }
-  return "Falha de conexão. Tente novamente."
-}
+const apiErrorDetail = (e: unknown) =>
+  apiErrorMessage(e, "Falha de conexão. Tente novamente.")
 
 const inputClass = "h-[46px] rounded-xl border-border text-base md:text-base"
 const labelClass = "text-xs font-normal text-muted-foreground"
@@ -541,7 +534,7 @@ export default function CoinForm() {
             <Button
               type="submit"
               disabled={saving}
-              variant={isEditing ? "gold" : "outline"}
+              variant={isEditing ? "accent" : "outline"}
               className={cn(
                 "h-[52px] rounded-[14px] text-[15px] md:flex-none md:px-8",
                 isEditing ? "flex-1" : "flex-1 border-border bg-card text-foreground",
@@ -553,7 +546,7 @@ export default function CoinForm() {
             {!isEditing && (
               <Button
                 type="button"
-                variant="gold"
+                variant="accent"
                 disabled={saving}
                 onClick={form.handleSubmit((v) => save(v, true))}
                 className="h-[52px] flex-[2] rounded-[14px] text-[15px] text-foreground md:flex-none md:px-8"

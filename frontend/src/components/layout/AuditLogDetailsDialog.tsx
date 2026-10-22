@@ -1,5 +1,3 @@
-// src/components/audit-log-details-dialog.tsx
-
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -9,129 +7,124 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { CoinAuditLog } from "@/lib/api"
-import { fieldLabel, formatValue, getChanges } from "@/lib/audit-log-diff"
+import { AUDIT_ACTIONS, auditActionLabel } from "@/lib/audit-action"
+import {
+  fieldLabel,
+  formatValue,
+  getChanges,
+  type JsonObject,
+} from "@/lib/audit-log-diff"
+import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 
 type Props = {
   log: CoinAuditLog
 }
 
-const actionLabel = (action: string) => {
-  const map: Record<string, string> = {
-    create: "CREATE",
-    update: "UPDATE",
-    delete: "DELETE",
-    import: "IMPORT",
-    adjust_in: "ADJUST IN",
-    adjust_out: "ADJUST OUT",
-  }
-  return map[action] ?? action.toUpperCase()
-}
-
 export function AuditLogDetailsDialog({ log }: Props) {
   const changes = getChanges(
-    (log.before ?? undefined) as any,
-    (log.after ?? undefined) as any
+    log.before as JsonObject | null,
+    log.after as JsonObject | null,
   )
 
   const coinTitle = log.coin
     ? `${log.coin.country} • ${log.coin.year} • ${log.coin.face_value}`
     : log.coin_id
-    ? `Coin ID: ${log.coin_id}`
-    : "Coin: —"
+    ? `ID da moeda: ${log.coin_id}`
+    : "—"
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline">View</Button>
+        <Button variant="outline" className="h-11 rounded-full">
+          Ver
+        </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl rounded-2xl">
         <DialogHeader>
-          <DialogTitle>Audit Log</DialogTitle>
-          <div className="text-sm text-muted-foreground">
-            {actionLabel(log.action)} •{" "}
-            {format(new Date(log.created_at), "yyyy-MM-dd HH:mm:ss")}
+          <DialogTitle className="font-display font-semibold">
+            Registro de auditoria
+          </DialogTitle>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <span
+              className={cn(
+                "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
+                AUDIT_ACTIONS[log.action]?.className ?? "bg-muted text-foreground",
+              )}
+            >
+              {auditActionLabel(log.action)}
+            </span>
+            <span>{format(new Date(log.created_at), "dd/MM/yyyy HH:mm:ss")}</span>
           </div>
         </DialogHeader>
 
-        <div className="space-y-4 max-h-[72vh] overflow-y-auto pr-1">
-          {/* Summary */}
-          <div className="rounded-md border p-3 bg-muted/30">
-            <div className="text-sm font-medium">Coin</div>
+        <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+          {/* Resumo */}
+          <div className="rounded-2xl bg-muted/40 p-4">
+            <div className="text-sm font-medium">Moeda</div>
             <div className="text-sm text-muted-foreground">{coinTitle}</div>
 
             <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
               <div>
-                <span className="font-medium">Actor:</span>{" "}
+                <span className="font-medium">Autor:</span>{" "}
                 <span className="text-muted-foreground">
                   {log.actor_email ?? "—"}
                 </span>
               </div>
               <div>
-                <span className="font-medium">Qty delta:</span>{" "}
+                <span className="font-medium">Variação:</span>{" "}
                 <span className="text-muted-foreground">
                   {log.delta_quantity ?? "—"}
                 </span>
               </div>
               {log.note ? (
                 <div className="col-span-2">
-                  <span className="font-medium">Note:</span>{" "}
+                  <span className="font-medium">Nota:</span>{" "}
                   <span className="text-muted-foreground">{log.note}</span>
                 </div>
               ) : null}
             </div>
           </div>
 
-          {/* Changes */}
+          {/* Alterações */}
           <div>
-            <div className="font-semibold mb-2">Changes</div>
+            <div className="mb-2 font-semibold">Alterações</div>
 
             {changes.length === 0 ? (
               <div className="text-sm text-muted-foreground">
-                No field-level changes found.
+                Nenhuma alteração de campo encontrada.
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground px-1">
-                  <div>Field</div>
-                  <div>Before</div>
-                  <div>After</div>
+                <div className="grid grid-cols-3 gap-2 px-1 text-xs text-muted-foreground">
+                  <div>Campo</div>
+                  <div>Antes</div>
+                  <div>Depois</div>
                 </div>
 
                 {changes.map((c) => {
-                  const beforeText = formatValue(c.before as any)
-                  const afterText = formatValue(c.after as any)
+                  const beforeText = formatValue(c.before)
+                  const afterText = formatValue(c.after)
 
                   const isMultiline =
                     beforeText.includes("\n") || afterText.includes("\n")
+                  const valueClass = isMultiline
+                    ? "whitespace-pre-wrap font-mono text-xs"
+                    : ""
 
                   return (
                     <div
                       key={c.field}
-                      className="grid grid-cols-3 gap-2 rounded-md border p-2 text-sm"
+                      className="grid grid-cols-3 gap-2 rounded-xl bg-muted/40 p-2 text-sm"
                     >
-                      <div className="font-medium break-words">
+                      <div className="break-words font-medium">
                         {fieldLabel(c.field)}
                       </div>
-
-                      <div
-                        className={`text-red-600 break-words ${
-                          isMultiline
-                            ? "whitespace-pre-wrap font-mono text-xs"
-                            : ""
-                        }`}
-                      >
+                      <div className={cn("break-words text-red-800", valueClass)}>
                         {beforeText}
                       </div>
-
-                      <div
-                        className={`text-green-600 break-words ${
-                          isMultiline
-                            ? "whitespace-pre-wrap font-mono text-xs"
-                            : ""
-                        }`}
-                      >
+                      <div className={cn("break-words text-success", valueClass)}>
                         {afterText}
                       </div>
                     </div>
@@ -141,23 +134,23 @@ export function AuditLogDetailsDialog({ log }: Props) {
             )}
           </div>
 
-          {/* Raw JSON */}
+          {/* JSON bruto */}
           <details className="text-sm">
             <summary className="cursor-pointer font-medium">
-              Raw JSON (debug)
+              JSON bruto (depuração)
             </summary>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+            <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
-                <div className="text-xs text-muted-foreground mb-1">Before</div>
-                <pre className="bg-muted p-2 rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
+                <div className="mb-1 text-xs text-muted-foreground">Antes</div>
+                <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl bg-muted p-2 text-xs">
                   {JSON.stringify(log.before, null, 2)}
                 </pre>
               </div>
 
               <div>
-                <div className="text-xs text-muted-foreground mb-1">After</div>
-                <pre className="bg-muted p-2 rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
+                <div className="mb-1 text-xs text-muted-foreground">Depois</div>
+                <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl bg-muted p-2 text-xs">
                   {JSON.stringify(log.after, null, 2)}
                 </pre>
               </div>

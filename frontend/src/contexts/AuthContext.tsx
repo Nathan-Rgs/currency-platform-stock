@@ -4,7 +4,7 @@ import { authApi, LoginResponse, Token } from '@/lib/api';
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
-  user: any; // Simplified user object
+  user: JwtPayload | null;
   login: (username: string, password: string) => Promise<LoginResponse>;
   finishMfaLogin: (token: Token) => void;
   logout: () => void;
@@ -13,8 +13,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export interface JwtPayload {
+  sub: string;
+  exp: number;
+}
+
 // A simple function to decode JWT and get user info
-const parseJwt = (token: string) => {
+const parseJwt = (token: string): JwtPayload | null => {
   try {
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -24,8 +29,8 @@ const parseJwt = (token: string) => {
         return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
     }).join(''));
 
-    return JSON.parse(jsonPayload);
-  } catch (e) {
+    return JSON.parse(jsonPayload) as JwtPayload;
+  } catch {
     return null;
   }
 };
@@ -42,7 +47,7 @@ const isTokenValid = (token: string | null) => {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<JwtPayload | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const checkAuth = () => {
@@ -99,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- context + hook intentionally colocated
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
