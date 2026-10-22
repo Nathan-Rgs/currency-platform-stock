@@ -1,6 +1,6 @@
 # Santos Numismática
 
-Plataforma de gerenciamento de coleção de moedas: painel administrativo privado (cadastro, importação/exportação de planilhas, dashboard) e galeria pública das moedas à venda, com contato por WhatsApp.
+Plataforma de gerenciamento de coleção de moedas: painel administrativo privado (cadastro, importação/exportação de planilhas, dashboard) e galeria pública com toda a coleção; as moedas à venda mostram também o preço e botões de contato (WhatsApp e e-mail).
 
 - `backend/`: API FastAPI + PostgreSQL (SQLAlchemy, Alembic).
 - `frontend/`: React + Vite + TypeScript.
@@ -36,7 +36,7 @@ Edite `backend/.env`:
 | Variável | Descrição |
 |---|---|
 | `DATABASE_URL` | Conexão com o Postgres. O valor do exemplo já funciona com o `docker-compose.yml`. |
-| `JWT_SECRET_KEY` | Chave secreta dos tokens de login. Use um valor longo e aleatório. |
+| `JWT_SECRET_KEY` | Chave secreta dos tokens de login. Use um valor longo e aleatório (mín. 32 caracteres). O backend se recusa a iniciar com o valor de exemplo `troca_essa_chave`. |
 | `JWT_ALGORITHM` | `HS256` (padrão). |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Duração da sessão em minutos (ex.: `1440` = 24 h). |
 | `MFA_SECRET_KEY` | Chave Fernet que cifra os segredos do MFA. Gere com o comando abaixo. |
@@ -141,3 +141,4 @@ Guarde as cópias fora do computador (nuvem ou HD externo) e teste a restauraç�
 - Datas no formato `dd/mm/yyyy`.
 - Valores numéricos sem separador de milhar (`1500,50`, e não `1.500,50`).
 - Linhas em branco no fim da planilha são ignoradas.
+- A importação sempre cria moedas novas — reimportar uma exportação duplica a coleção.
