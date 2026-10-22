@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import datetime
 
 from pydantic import ValidationError
 
@@ -19,7 +20,20 @@ def decode(content: bytes) -> str:
     try:
         return content.decode("utf-8-sig")
     except UnicodeDecodeError:
-        raise ImportFileError("Arquivo não está em UTF-8 válido.")
+        pass
+    try:
+        return content.decode("cp1252")  # Excel pt-BR "CSV" default
+    except UnicodeDecodeError:
+        raise ImportFileError("Codificação não reconhecida (use UTF-8 ou Windows-1252).")
+
+
+def parse_br_date(value: str):
+    for fmt in ("%d/%m/%Y %H:%M", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            pass
+    return value  # ISO or invalid: left for pydantic
 
 
 def parse_csv(text: str) -> list[dict]:
@@ -38,6 +52,8 @@ def normalize_row(row: dict) -> dict:
             value = value.strip() or None
         if value is not None and key in FLOAT_FIELDS | INT_FIELDS and isinstance(value, str):
             value = value.replace(",", ".")
+        if key == "acquisition_date" and isinstance(value, str):
+            value = parse_br_date(value)
         out[key] = value
     return out
 

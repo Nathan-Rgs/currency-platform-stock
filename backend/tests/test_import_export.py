@@ -74,3 +74,22 @@ def test_template_header_only(client, auth_headers):
     expected = [f for f in CoinCreate.model_fields if not f.startswith("image_url_")]
     assert len(lines) == 1 and lines[0].split(";") == expected
     assert client.get("/api/v1/coins/import/template").status_code in (401, 403)
+
+
+def test_import_csv_cp1252(client, auth_headers):
+    csv = "title;year;country;face_value\nRéis;1889;Portugal;20 Réis\n".encode("cp1252")
+    assert _post(client, auth_headers, "c.csv", csv).json() == {"inserted": 1, "errors": []}
+    got = client.get("/api/v1/coins", headers=auth_headers).json()["data"][0]
+    assert got["title"] == "Réis"
+
+
+def test_import_br_dates(client, auth_headers):
+    csv = (
+        "title;year;country;face_value;acquisition_date\n"
+        "a;1994;BR;1;18/12/2024\nb;1994;BR;1;18/12/2024 10:30\n"
+        "c;1994;BR;1;2024-12-18\nd;1994;BR;1;31/02/2024\n"
+    ).encode()
+    r = _post(client, auth_headers, "c.csv", csv).json()
+    assert r["inserted"] == 3 and [e["row"] for e in r["errors"]] == [4]
+    data = client.get("/api/v1/coins", headers=auth_headers).json()["data"]
+    assert all(c["acquisition_date"].startswith("2024-12-18") for c in data)
