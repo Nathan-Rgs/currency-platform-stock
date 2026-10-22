@@ -119,14 +119,16 @@ São dois itens e **os dois são necessários**: o banco (dados) e a pasta `back
 Backup:
 
 ```bash
-docker exec currency_postgres pg_dump -U currency_user -d currency_db -Fc > backup.dump
+docker exec currency_postgres pg_dump -U currency_user -d currency_db -Fc -f /tmp/backup.dump
+docker cp currency_postgres:/tmp/backup.dump ./backup.dump
 cp -r backend/media backup-media      # Windows: xcopy backend\media backup-media /E /I
 ```
 
 Restauração (em um banco vazio, com o container rodando):
 
 ```bash
-docker exec -i currency_postgres pg_restore -U currency_user -d currency_db --clean --if-exists < backup.dump
+docker cp ./backup.dump currency_postgres:/tmp/backup.dump
+docker exec currency_postgres pg_restore -U currency_user -d currency_db --clean --if-exists /tmp/backup.dump
 cp -r backup-media/. backend/media/   # Windows: xcopy backup-media backend\media /E /I /Y
 ```
 
