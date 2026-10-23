@@ -73,7 +73,9 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_coins_originality'), ['originality'], unique=False)
         batch_op.create_index(batch_op.f('ix_coins_owner_id'), ['owner_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_coins_year'), ['year'], unique=False)
-        batch_op.drop_constraint('coins_owner_id_fkey', type_='foreignkey')
+        # Old DBs have Postgres' default name, fresh ones the naming-convention name.
+        op.execute('ALTER TABLE coins DROP CONSTRAINT IF EXISTS coins_owner_id_fkey')
+        op.execute('ALTER TABLE coins DROP CONSTRAINT IF EXISTS fk_coins_owner_id_users')
         batch_op.create_foreign_key(batch_op.f('fk_coins_owner_id_users'), 'users', ['owner_id'], ['id'], ondelete='CASCADE')
 
     with op.batch_alter_table('users', schema=None) as batch_op:
@@ -81,7 +83,8 @@ def upgrade() -> None:
                existing_type=sa.VARCHAR(length=255),
                type_=sa.String(length=320),
                existing_nullable=False)
-        batch_op.drop_constraint('users_email_key', type_='unique')
+        op.execute('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key')
+        op.execute('ALTER TABLE users DROP CONSTRAINT IF EXISTS uq_users_email')
         batch_op.create_index(batch_op.f('ix_users_email'), ['email'], unique=True)
 
 
